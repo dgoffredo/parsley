@@ -1,9 +1,9 @@
-Grammar  ::=  rules:(Rule (BLANK_LINE Rule)*)
+Grammar  ::=  rules:(Rule (BLANK_LINE+ Rule)*) BLANK_LINE*
 
 Rule  ::=  ignore:("ignore"?) name:IDENTIFIER ("::="|":") pattern:Pattern
 
-Pattern  ::=  alternation:Alternation      (* one from multiple options *)
-          |   concatenation:Concatenation  (* one or more subpatterns *)
+Pattern  ::=  alternation:Alternation      # one from multiple options
+          |   concatenation:Concatenation  # one or more subpatterns
 
 Alternation  ::=  patterns:(PatternTerm ("|" PatternTerm)+)
 
@@ -23,21 +23,17 @@ UnquantifiedPatternTerm  ::=  literal:STRING
                           |   regex:REGEX
                           |   rule:IDENTIFIER
                           |   empty:EMPTY
-                          |   "(" pattern:Pattern ")"
+                          |   ("(" pattern:Pattern ")")
 
-IDENTIFIER  ::=  /[a-zA-Z_][0-9a-zA-Z_]*/      (* e.g. foo5 but not 5foo *)
+IDENTIFIER  ::=  /[a-zA-Z_][0-9a-zA-Z_]*/
 
-STRING  ::=  /"([^\\"]|\\.)*"/                 (* e.g. "\"with\" escape" *)
+STRING  ::=  /"([^\\"]|\\.)*"/
 
-REGEX  ::=  /\/([^\\\/]|\\.)*\//               (* e.g. /foo|ba[rz]/ *)
+REGEX  ::=  /\/([^\\\/]|\\.)*\//
 
-EMPTY  ::=  /\(\)/                             (* () matches nothing *)
+EMPTY  ::=  /\(\)/
 
-ignore COMMENT  ::=  /\(\*([^*]|\*[^)])*\*\)/  (* e.g. this comment *)
-
-(* We want to simulataneously treat a blank line as a rule delimiter, but
-    also otherwise ignore whitespace. To do that, stretches of whitespace
-    have to be categorized by their adjacency to non-whitespace. *)
+ignore COMMENT  ::=  /\(\*([^*]|\*[^)])*\*\)/
 
 BLANK_LINE  ::=  /\s*\n\s*\n\s*/
 

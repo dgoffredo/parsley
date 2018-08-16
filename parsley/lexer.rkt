@@ -27,15 +27,15 @@
 
 (define get-token
   (let ([regex @pregexp-alternation{
-           @list{[a-zA-Z_][0-9a-zA-Z_]*}   IDENTIFIER
-           @list{"(([^\\"]|\\.)*)"}        STRING
-           @list{/(([^\\/]|\\.)*)/}        REGEX
-           @list{\(\)}                     EMPTY
-           @list{\(\*(([^*]|\*[^)])*)\*\)} COMMENT
-           @list{@"\\s*\n\\s*\n\\s*"}      BLANK_LINE
-           @list{\s+(?=\S)}                WS_LEFT
-           @list{\s+$}                     WS_END
-           @list{ignore|::=|[:|*?()]}      other]}])
+           @list{[a-zA-Z_][0-9a-zA-Z_]*} IDENTIFIER
+           @list{"(([^\\"]|\\.)*)"}      STRING
+           @list{/(([^\\/]|\\.)*)/}      REGEX
+           @list{\(\)}                   EMPTY
+           @list{(?m:#(.*)$)}            COMMENT
+           @list{@"\\s*\n\\s*\n\\s*"}    BLANK_LINE
+           @list{\s+(?=\S)}              WS_LEFT
+           @list{\s+$}                   WS_END
+           @list{::=|[:|*?+()]}          other]}])
     (lambda (in)
       (~>> in (regexp-try-match regex) matches->utf-8 matches->token))))
 
@@ -53,14 +53,14 @@
   (match regex-groups
     ; Named subgroups would be nice, wouldn't they?
     [(list _ identifier #f ...)
-     (token 'IDENTIFIER identifier)]
+     (token 'IDENTIFIER (string->symbol identifier))]
     [(list _ #f string inside _ #f ...)
      (token 'STRING inside)]
     [(list _ #f #f #f #f regex inside _ #f ...)
-     (token 'REGEX inside)]
+     (token 'REGEX `(regex ,inside))]
     [(list _ #f #f #f #f #f #f #f empty #f ...)
      (token 'EMPTY)]
-    [(list _ #f ... comment inside _ #f #f #f #f)
+    [(list _ #f ... comment inside #f #f #f #f)
      (token 'COMMENT inside #:skip? #t)]
     [(list _ #f ... blank-line #f #f #f)
      ; Note that we don't #skip? blank lines, because they're used as a rule
@@ -80,8 +80,10 @@
 
 (define (debug token)
   (match token
+    [(token-struct 'WS_LEFT _ _ _ _ _ _)
+     (void)]
     [(token-struct type value _ _ _ _ _)
-     (displayln (~a type " " (string-trim (or value ""))))]
+     (displayln (~a type " " (or value "")))]
     [other
      (displayln (~a "OTHER " other))])
   token)

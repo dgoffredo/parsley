@@ -1,29 +1,31 @@
 #lang brag
 
-Grammar  ::=  Rule (/BLANK_LINE Rule)*
+Grammar  ::=  Rule (/BLANK_LINE+ Rule)* /BLANK_LINE*
 
-Rule  ::=  "ignore"? IDENTIFIER /("::="|":") Pattern
+Rule  ::=  IDENTIFIER? IDENTIFIER /("::="|":") @Pattern
 
-Pattern  ::=  Alternation   (* one from multiple options *)
-          |   Concatenation (* one or more subpatterns *)
+Pattern  ::=  Alternation
+          |   Concatenation
+          |   @PatternTerm
 
-Alternation  ::=  PatternTerm (/"|" PatternTerm)+
+Alternation  ::=  @PatternTerm (/"|" @PatternTerm)+
 
-Concatenation  ::=  PatternTerm+
+Concatenation  ::=  @PatternTerm+
 
-PatternTerm  ::=  BoundPatternTerm
-              |   QuantifiedPatternTerm
+PatternTerm  ::=  STRING
+              |   REGEX
+              |   IDENTIFIER
+              |   EMPTY
+              |   /"(" @Pattern /")"
+              |   Bound
+              |   Star
+              |   Plus
+              |   Question
 
-BoundPatternTerm  ::=  IDENTIFIER /":" QuantifiedPatternTerm
+Bound  ::=  IDENTIFIER /":" @PatternTerm
 
-QuantifiedPatternTerm  ::=  UnquantifiedPatternTerm "*"
-                        |   UnquantifiedPatternTerm "+"
-                        |   UnquantifiedPatternTerm "?"
-                        |   UnquantifiedPatternTerm
+Star  ::=  @PatternTerm /"*"
 
-UnquantifiedPatternTerm  ::=  STRING
-                          |   REGEX
-                          |   IDENTIFIER
-                          |   EMPTY
-                          |   /"(" Pattern /")"
-                          |   Pattern
+Plus  ::=  @PatternTerm /"+"
+
+Question  ::=  @PatternTerm /"?"
