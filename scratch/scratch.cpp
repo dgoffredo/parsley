@@ -84,6 +84,8 @@ IMPLEMENT_PARSE_FUNCTION(Argument)
 
 namespace {
 
+// maybe TokenCursor := (TokenIterator, end TokenIterator, atEnd() method)
+
 int read(Path          *object,
          TokenIterator *tokenIter,
          bsl::ostream  *errors = 0)
@@ -171,6 +173,43 @@ int read(Term          *object,
     return 1;
 }
 
+int readFunctionArgs(bsl::vector<Argument> *arguments, 
+                     TokenIterator         *tokenIter,
+                     bsl::ostream          *errors = 0)
+{
+    const char k_PATTERN[] = "Argument (SEPARATOR Argument)*";
+
+    // Argument (SEPARATOR Argument)*
+
+    // Argument
+    Argument argument;
+    if (read(&argument, tokenIter, errors)) {
+        if (errors) {
+            *errors << "Unable to read first Argument in pattern:"
+                    << k_PATTERN;
+        }
+
+        return 2;
+    }
+    
+    arguments->push_back(argument);
+
+    // (SEPARATOR Argument)*
+    for (;;) {
+        if (read(tokens::e_SEPARATOR, tokenIter)) {
+            break;
+        }
+
+        if (read(&argument, tokenIter)) {
+            break;
+        }
+
+        arguments->push_back(argument);
+    }
+
+    return 0;
+}
+
 int read(Function      *object,
          TokenIterator *tokenIter,
          bsl::ostream  *errors = 0)
@@ -206,47 +245,8 @@ int read(Function      *object,
         }
     }
 
-    // TODO: Is there a way better than generating a normal function that does
-    //       this?
-    struct OneOrMoreArguments {
-        static int parse(bsl::vector<Argument> *arguments, 
-                         TokenIterator         *tokenIter,
-                         bsl::ostream          *errors = 0)
-        {
-            const char k_PATTERN[] = "Argument (SEPARATOR Argument)*";
-
-            // Argument (SEPARATOR Argument)*
-
-            // Argument
-            Argument argument;
-            if (read(&argument, tokenIter, errors)) {
-                if (errors) {
-                    *errors << "Unable to read first Argument in pattern:"
-                            << k_PATTERN;
-                }
-        
-                return 2;
-            }
-            
-            arguments->push_back(argument);
-        
-            // (SEPARATOR Argument)*
-            for (;;) {
-                if (read(tokens::e_SEPARATOR, tokenIter)) {
-                    break;
-                }
-        
-                if (read(&argument, tokenIter)) {
-                    break;
-                }
-        
-                arguments->push_back(argument);
-            }
-        }
-    };
-
     // (Argument (SEPARATOR Argument)*)? 
-    OneOrMoreArguments::parse(&object->args(), tokenIter);
+    readFunctionArgs(&object->args(), tokenIter);
 
     if (read(tokens::e_RPAREN, tokenIter, errors)) {
         if (errors) {

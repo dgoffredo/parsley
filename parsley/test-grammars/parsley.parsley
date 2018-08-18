@@ -1,11 +1,11 @@
-Grammar  ::=  rules:(Rule (BLANK_LINE+ Rule)*) BLANK_LINE*
+Grammar  ::=  rules:Rule (BLANK_LINE+ rules:Rule)* BLANK_LINE*
 
 Rule  ::=  ignore:("ignore"?) name:IDENTIFIER ("::="|":") pattern:Pattern
 
 Pattern  ::=  alternation:Alternation      # one from multiple options
           |   concatenation:Concatenation  # one or more subpatterns
 
-Alternation  ::=  patterns:(PatternTerm ("|" PatternTerm)+)
+Alternation  ::=  patterns:PatternTerm ("|" patterns:PatternTerm)+
 
 Concatenation  ::=  patterns:(PatternTerm+)
 

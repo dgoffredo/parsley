@@ -6,36 +6,37 @@
          threading
          brag/support)
 
+(struct re (pattern) #:transparent)
+
 (define (pregexp-alternation . args)
   ; This procedure is meant to be used with the @ reader syntax. It takes a
-  ; list of arguments produced by @pregexp-alternation{...} syntax, discards
-  ; any that are not lists, and then assumes that each of the remaining lists
-  ; each has one element. Those elements are stringified using ~a and then
-  ; joined together separated by "|" before invoking pregexp on the resulting
-  ; string, so that the of this procedure is a regular expression that is an
-  ; alternation of subpatterns in the originally specified @ syntax text.
-  ; Non-lists are ignored so that they can appear in the @ syntax as comments,
-  ; e.g.
+  ; list of arguments produced by @pregexp-alternation{...} syntax and
+  ; discards any that are not `re` structs . The patterns within those `re`
+  ; structs are then joined together separated by "|" before invoking pregexp
+  ; on the resulting string, so that the of this procedure is a regular
+  ; expression that is an alternation of subpatterns in the originally
+  ; specified @ syntax text. Non-lists are ignored so that they can appear in
+  ; the @ syntax as comments, e.g.
   ;     @pregexp-alternation{@list{1st pattern} ignored @list{2nd pattern}}
   ; yields
   ;     (pregexp "1st pattern|2nd pattern")
   (~>> args
-    (filter list?)
-    (map (match-lambda [(list piece) (~a "(" piece ")")]))
+    (filter re?)
+    (map (match-lambda [(re pattern) (string-append "(" pattern ")")]))
     (string-join _ "|")
     pregexp))
 
 (define get-token
   (let ([regex @pregexp-alternation{
-           @list{[a-zA-Z_][0-9a-zA-Z_]*} IDENTIFIER
-           @list{"(([^\\"]|\\.)*)"}      STRING
-           @list{/(([^\\/]|\\.)*)/}      REGEX
-           @list{\(\)}                   EMPTY
-           @list{(?m:#(.*)$)}            COMMENT
-           @list{@"\\s*\n\\s*\n\\s*"}    BLANK_LINE
-           @list{\s+(?=\S)}              WS_LEFT
-           @list{\s+$}                   WS_END
-           @list{::=|[:|*?+()]}          other]}])
+           @re{['a-zA-Z_]['0-9a-zA-Z_]*} IDENTIFIER
+           @re{"(([^\\"]|\\.)*)"}        STRING
+           @re{/(([^\\/]|\\.)*)/}        REGEX
+           @re{\(\)}                     EMPTY
+           @re{(?m:#(.*)$)}              COMMENT
+           @re{@"\\s*\n\\s*\n\\s*"}      BLANK_LINE
+           @re{\s+(?=\S)}                WS_LEFT
+           @re{\s+$}                     WS_END
+           @re{::=|[:|*?+()]}            other]}])
     (lambda (in)
       (~>> in (regexp-try-match regex) matches->utf-8 matches->token))))
 
@@ -75,17 +76,23 @@
      ; "other" tokens are just the string value
      other]
     [nonmatching 
-     (displayln (~a "didn't match: " nonmatching) (current-error-port))
+     (displayln 
+       (~a "The following regex match groups were not anticipated: "
+         nonmatching) 
+       (current-error-port))
      #f]))
 
+(define debugging #f)
+
 (define (debug token)
-  (match token
-    [(token-struct 'WS_LEFT _ _ _ _ _ _)
-     (void)]
-    [(token-struct type value _ _ _ _ _)
-     (displayln (~a type " " (or value "")))]
-    [other
-     (displayln (~a "OTHER " other))])
+  (when debugging
+    (match token
+      [(token-struct 'WS_LEFT _ _ _ _ _ _)
+       (void)]
+      [(token-struct type value _ _ _ _ _)
+       (displayln (~a type " " (or value "")))]
+      [other
+       (displayln (~a "OTHER " other))]))
   token)
 
 (define (lex in)
