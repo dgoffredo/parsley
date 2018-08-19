@@ -19,7 +19,7 @@ Instead, let's leave boost aside. Say you want to parse a path-like language:
 
 First, write a grammar:
 
-    Path  ::=  terms:(Term ("/" Term)*)
+    Path  ::=  terms:Term ("/" terms:Term)*
     
     Term  ::=  identifier:IDENTIFIER
            |   wildcard:"*"
@@ -28,7 +28,7 @@ First, write a grammar:
     
     Function  ::=  
         name:IDENTIFIER 
-        args:("(" (Argument (SEPARATOR Argument)*)? ")")
+        "(" (args:Argument (SEPARATOR args:Argument)*)? ")"
     
     Argument  ::= identifier:IDENTIFIER
                |  stringLiteral:STRING
@@ -130,25 +130,25 @@ TODO: Write a guide.
 
 For fun, here's the grammar description language expressed in itself:
 
-    Grammar  ::=  WS_LEFT? rules:(Rule (BLANK_LINE Rule)*) WS_END?
+    Grammar  ::=  WS_LEFT? rules:Rule (BLANK_LINE rules:Rule)*) WS_END?
 
-    Rule  ::=  ignore:("ignore"?) name:IDENTIFIER ("::="|":") pattern:Pattern
+    Rule  ::=  ignore:"ignore"? name:IDENTIFIER ("::="|":") pattern:Pattern
 
     Pattern  ::=  alternation:Alternation     (* one from multiple options *)
               |   concatenation:Concatenation (* one or more subpatterns *)
 
-    Alternation  ::=  patterns:(PatternTerm ("|" PatternTerm)+)
+    Alternation  ::=  patterns:PatternTerm ("|" patterns:PatternTerm)+
 
-    Concatenation  ::=  patterns:(PatternTerm+)
+    Concatenation  ::=  patterns:PatternTerm+
 
     PatternTerm  ::=  bound:BoundPatternTerm
                   |   unbound:QuantifiedPatternTerm
 
     BoundPatternTerm  ::=  name:IDENTIFIER ":" term:QuantifiedPatternTerm
 
-    QuantifiedPatternTerm  ::=  star:(UnquantifiedPatternTerm "*")
-                            |   plus:(UnquantifiedPatternTerm "+")
-                            |   question:(UnquantifiedPatternTerm "?")
+    QuantifiedPatternTerm  ::=  star:UnquantifiedPatternTerm "*"
+                            |   plus:UnquantifiedPatternTerm "+"
+                            |   question:UnquantifiedPatternTerm "?"
                             |   term:UnquantifiedPatternTerm
 
     UnquantifiedPatternTerm  ::=  literal:STRING

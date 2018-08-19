@@ -1,6 +1,6 @@
 #lang brag
 
-Grammar  ::=  Rule (/BLANK_LINE+ Rule)* /BLANK_LINE*
+Grammar  ::=  Rule (/(BLANK_LINE | ".")+ Rule)* /BLANK_LINE*
 
 Rule  ::=  IDENTIFIER? IDENTIFIER /("::="|":") @Pattern
 

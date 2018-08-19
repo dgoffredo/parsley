@@ -7,9 +7,9 @@ Term  ::=  identifier:IDENTIFIER
 
 Function  ::=  
     name:IDENTIFIER 
-    args:("(" (Argument (SEPARATOR Argument)*)? ")")
+    "(" (args:Argument (SEPARATOR args:Argument)*)? ")"
 
-Argument  ::= identifier:IDENTIFIER
+Argument  ::=  identifier:IDENTIFIER
             |  stringLiteral:STRING
             |  integer:INTEGER
 

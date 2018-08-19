@@ -28,15 +28,15 @@
 
 (define get-token
   (let ([regex @pregexp-alternation{
-           @re{['a-zA-Z_]['0-9a-zA-Z_]*} IDENTIFIER
-           @re{"(([^\\"]|\\.)*)"}        STRING
-           @re{/(([^\\/]|\\.)*)/}        REGEX
-           @re{\(\)}                     EMPTY
-           @re{(?m:#(.*)$)}              COMMENT
-           @re{@"\\s*\n\\s*\n\\s*"}      BLANK_LINE
-           @re{\s+(?=\S)}                WS_LEFT
-           @re{\s+$}                     WS_END
-           @re{::=|[:|*?+()]}            other]}])
+           @re{['0-9a-zA-Z_\-]+}    IDENTIFIER
+           @re{"(([^\\"]|\\.)*)"}   STRING
+           @re{/(([^\\/]|\\.)*)/}   REGEX
+           @re{\(\)}                EMPTY
+           @re{(?m:#(.*)$)}         COMMENT
+           @re{@"\\s*\n\\s*\n\\s*"} BLANK_LINE
+           @re{\s+(?=\S)}           WS_LEFT
+           @re{\s+$}                WS_END
+           @re{::=|[:|*?+()\.]}     other]}])
     (lambda (in)
       (~>> in (regexp-try-match regex) matches->utf-8 matches->token))))
 
@@ -60,7 +60,7 @@
     [(list _ #f #f #f #f regex inside _ #f ...)
      (token 'REGEX `(regex ,inside))]
     [(list _ #f #f #f #f #f #f #f empty #f ...)
-     (token 'EMPTY)]
+     (token 'EMPTY '())]
     [(list _ #f ... comment inside #f #f #f #f)
      (token 'COMMENT inside #:skip? #t)]
     [(list _ #f ... blank-line #f #f #f)
