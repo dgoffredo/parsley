@@ -6,7 +6,7 @@
          threading
          srfi/1)
 
-(define-for-syntax debugging? #t)
+(define-for-syntax debugging? #f)
 
 (define-syntax (debug stx)
   (syntax-case stx ()
@@ -75,7 +75,7 @@
        (debug "Alternation array" ": " tree)
        `(#:array ,type)]
   
-      ; - besides arrays, alternation between a nullable and anything is nullable
+      ; - besides arrays, alternation between nullable and anything is nullable
       [`(Alternation ,@(list-no-order `(#:nullable ,type) _ ...))
        (debug "Alternation nullable" ": " tree)
        `(#:nullable ,type)]
@@ -83,6 +83,7 @@
       ; - alternation among only the type is just the type
       [`(Alternation (#:type ,type) ..1)
        (debug "Alternation type only" ": " tree)
+       ; TODO: Might this code be the right place to assert consistent types?
        `(#:type ,(first type))] ; `first` because `type` is a (list t t)
   
       ; besides arrays and nullables, alternation between the type and anything
@@ -154,9 +155,9 @@
 
       [_ binding-paths])))
 
-(struct rule/terminal (name pattern)          #:transparent)
-(struct rule/class    (name pattern bindings) #:transparent)
-(struct rule/other    (name pattern)          #:transparent)
+(struct rule/terminal (name modifiers pattern) #:transparent)
+(struct rule/class    (name pattern bindings)  #:transparent)
+(struct rule/other    (name pattern)           #:transparent)
 
 (define (terminal-pattern? pattern)
   (match pattern 
@@ -166,10 +167,20 @@
 
 (define (categorize-rule rule)
   (match rule
-    [(list 'Rule name pattern)
+    [(list 'Rule modifiers ... name pattern)
      (if (terminal-pattern? pattern)
-       (rule/terminal name pattern)
+       (rule/terminal modifiers name pattern)
        (let ([bindings (binding-paths pattern)])
+         ; If there are bindings, then it's a class. Otherwise, it's an other.
+         ; First, though, make sure that there are no modifiers, since only
+         ; terminals may have modifiers.
+         (unless (empty? modifiers)
+           (raise-user-error
+             (~a "The grammar rule named " (~s (~a name))
+               " contains the modifers " modifiers
+               " but was not deduced to be a terminal. Only terminals may "
+               "have modifiers. A terminal is any rule whose pattern is just "
+               "a string or a regular expression.")))
          (if (empty? bindings)
            (rule/other name pattern)
            (rule/class name pattern bindings))))]))
@@ -185,11 +196,69 @@
          [prefix-path (apply common-prefix paths)]
          [subtree (follow-path prefix-path tree)])
     subtree))
-     
-; (struct rule/class (name pattern bindings) #:transparent)
+
+(define (drop-last lst)
+  (take lst (- (length lst) 1)))
+
+(define (find-along-path found? path tree)
+  (let recur ([path path] [tree tree])
+    (cond 
+      [(found? tree) tree]
+      [(empty? path) #f]
+      [else
+       (match tree 
+         [(list _ subtrees ...) 
+          (recur (rest path) (list-ref subtrees (first path)))]
+         [_ #f])])))
+
+(define (alternation-or-star? tree)
+  (match tree
+    [(list 'Alternation _ ...)  #t]
+    [(list 'Star _)             #t]
+    [_                          #f]))
+
+(define (after-prefix prefix-path path tree)
+  (~> path
+    (take (+ 1 (length prefix-path)))
+    (follow-path tree)))
+
 (define (class-category rule)
   (match rule
     [(rule/class name pattern bindings)
-     (match (bindings-common-ancestor bindings pattern)
-       [(list 'Alternation _ ...) ; TODO: not quite (but I have the paths)
-        (if (every (match-lambda [(list name path) (binding-type name TODO)])))])]))
+     (let* ([paths (map second bindings)]
+            [prefix-path (apply common-prefix paths)]
+            [subtree (follow-path prefix-path pattern)])
+       (match subtree
+         [(list 'Alternation _ ...)
+          ; If all of the following are true:
+          ; - the most recent common ancestor is an Alternation,
+          ; - there are no Star or Alternation nodes between the common
+          ;   ancestor and root,
+          ; - the "binding type" of each binding relative to the node just
+          ;   below the common ancestor is not #:array or #:nullable,
+          ; then the "class category" of the rule is 'choice. Otherwise, it's
+          ; 'sequence.
+          (if 
+            (and
+              ; - no Star or Alternation leading up to common ancestor
+              (not (find-along-path alternation-or-star? 
+                                    (drop-last prefix-path) 
+                                    pattern))
+              ; types as calculated from just below the common ancestor are not
+              ; #:array or #:nullable
+              (for/and ([binding bindings])
+                (match binding
+                  [(list name path)
+                   (match (binding-type 
+                            name 
+                            (after-prefix prefix-path path pattern))
+                     [`(#:array ,_)    #f]
+                     [`(#:nullable ,_) #f]
+                     [_                #t])])))
+            ; The above is true, so this is a choice.
+            'choice
+            ; The above is not true, so this is a sequence.
+            'sequence)]
+         ; The common ancestor is not an Alternation, so this is a sequence.
+         [_ 'sequence]))]))
+                 
