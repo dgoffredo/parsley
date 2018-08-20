@@ -30,14 +30,15 @@
 
 (define-tree-transformer remove-plus
   [`(Plus ,pattern)
-   `(Concatenation ,pattern (Star ,pattern))])
+    (let ([pattern (remove-plus pattern)])
+      `(Concatenation ,pattern (Star ,pattern)))])
 
 (define-tree-transformer remove-question
   [`(Question ,pattern)
-   `(Alternation ,pattern ())])
+   `(Alternation ,(remove-question pattern) ())])
 
-(define (alternation-or-concatenation? sym)
-  (member sym '(Alternation Concatenation)))
+(define (alternation/concatenation? symbol)
+  (member symbol '(Alternation Concatenation)))
 
 ; The input language is the parse tree with the following modifications:
 ; - (Plus expr) has been transformed into (Concatenation expr (Star expr))
@@ -111,8 +112,8 @@
 
       ;; recursion
   
-      [(list (? alternation-or-concatenation? operation) subtrees ...)
-       (debug "recur alternation-or-concatenation" ": " tree)
+      [(list (? alternation/concatenation? operation) subtrees ...)
+       (debug "recur alternation/concatenation" ": " tree)
        (~>> subtrees (map recur) (cons operation) recur)]
   
       [(list 'Star subtree)
@@ -191,12 +192,6 @@
       [(list _ subtrees ...)
        (list-ref subtrees index)])))
 
-(define (bindings-common-ancestor bindings tree)
-  (let* ([paths (map second bindings)]
-         [prefix-path (apply common-prefix paths)]
-         [subtree (follow-path prefix-path tree)])
-    subtree))
-
 (define (drop-last lst)
   (take lst (- (length lst) 1)))
 
@@ -211,7 +206,7 @@
           (recur (rest path) (list-ref subtrees (first path)))]
          [_ #f])])))
 
-(define (alternation-or-star? tree)
+(define (alternation/star? tree)
   (match tree
     [(list 'Alternation _ ...)  #t]
     [(list 'Star _)             #t]
@@ -241,9 +236,10 @@
           (if 
             (and
               ; - no Star or Alternation leading up to common ancestor
-              (not (find-along-path alternation-or-star? 
-                                    (drop-last prefix-path) 
-                                    pattern))
+              (or (empty? prefix-path)
+                  (not (find-along-path alternation/star? 
+                                        (drop-last prefix-path) 
+                                        pattern)))
               ; types as calculated from just below the common ancestor are not
               ; #:array or #:nullable
               (for/and ([binding bindings])
