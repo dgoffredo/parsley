@@ -178,9 +178,9 @@
            (raise-user-error
              (~a "The grammar rule named " (~s (~a name))
                " contains the modifers " modifiers
-               " but was not deduced to be a terminal. Only terminals may "
-               "have modifiers. A terminal is any rule whose pattern is just "
-               "a string or a regular expression.")))
+               " but was not deduced to be terminal. Only terminal rules may "
+               "have modifiers. A terminal rule is any rule whose pattern is "
+               "either just a string or a regular expression.")))
          (if (empty? bindings)
            (rule/other name pattern)
            (rule/class name pattern bindings))))]))
