@@ -5,7 +5,7 @@
 #include <bsl_iostream.h>
 #include <bsl_ostream.h>
 
-namespace BloombergLP {
+namespace Enterprise {
 namespace package {
 namespace {
 

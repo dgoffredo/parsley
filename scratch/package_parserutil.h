@@ -4,7 +4,7 @@
 #include <bsl_iosfwd.h>
 #include <bsl_string.h>
 
-namespace BloombergLP {
+namespace Enterprise {
 namespace package {
 class Bar;
 class Foo;

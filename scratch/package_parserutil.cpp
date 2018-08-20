@@ -4,13 +4,13 @@
 
 #include <bsl_vector.h>
 
-namespace BloombergLP {
+namespace Enterprise {
 namespace package {
 namespace {
 
-// TODO: all the read functions (that's where it's at)
-
 typedef bsl::vector<LexerToken>::const_iterator TokenIter;
+
+// TODO: all the read functions (that's where it's at)
 
 int tokenize(bsl::vector<LexerToken>  *tokens,
              const bslstl::StringRef&  input,

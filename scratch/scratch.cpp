@@ -1,7 +1,7 @@
 // Let's first try to write a recursive descent parser by hand-using BDE stuff,
 // and only then think about writing a parser generator.
 
-namespace BloombergLP {
+namespace Enterprise {
 namespace pathstuff {
 
 struct ParserUtil {

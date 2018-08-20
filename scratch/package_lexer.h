@@ -13,7 +13,7 @@
 #include <bsl_utility.h>
 #include <bsl_vector.h>
 
-namespace BloombergLP {
+namespace Enterprise {
 namespace bslma { class Allocator; }
 namespace package {
 
