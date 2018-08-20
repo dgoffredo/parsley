@@ -1,6 +1,6 @@
 Languages
 =========
-Parsley proceeds as a tree of transformations starting with the parse tree'
+Parsley proceeds as a tree of transformations starting with the parse tree
 of the grammar (`.parsley`) file and ending with an XSD and various C++ source
 files.
 

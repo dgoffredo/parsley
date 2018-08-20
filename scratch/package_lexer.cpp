@@ -73,23 +73,23 @@ class IsMatch {
     // record is matched in a bound vector of subpattern match intervals.
 
     // DATA
-    const bsl::vector<bsl::pair<bsl::size_t, bsl::size_t> > *d_matches;
+    const bsl::vector<bsl::pair<bsl::size_t, bsl::size_t> > *d_matches_p;
 
   public:
     // CREATORS
     explicit IsMatch(
         const bsl::vector<bsl::pair<bsl::size_t, bsl::size_t> >& matches)
-    : d_matches(&matches)
+    : d_matches_p(&matches)
     {
     }
 
     // MANIPULATORS
     bool operator()(const Lexer_SubpatternRecord& subpattern) const
     {
-        BSLS_ASSERT(d_matches);
-        BSLS_ASSERT(subpattern.d_index < d_matches->size());
+        BSLS_ASSERT(d_matches_p);
+        BSLS_ASSERT(subpattern.d_index < d_matches_p->size());
 
-        return d_matches[subpattern.d_index].first != bsl::size_t(-1);
+        return (*d_matches_p)[subpattern.d_index].first != bsl::size_t(-1);
     }
 };
 
@@ -153,7 +153,9 @@ int Lexer::operator()(bsl::vector<Token>       *output,
             errorStream << "Depth limit exceeded.\n";
             // fall through
           default:
-            errorStream << "Failed to match the text: " << input 
+            errorStream << "Failed to match the text: "
+                        << bslstl::StringRef(input.begin() + offset,
+                                             input.end())
                         << "\nagainst the pattern: " << d_regex.pattern()
                         << "\nerror code: " << rc;
             return rc;  // match failure
