@@ -74,7 +74,6 @@ class Lexer {
     bdlpcre::RegEx                                    d_regex;
     bsl::vector<bsl::pair<bsl::size_t, bsl::size_t> > d_matches;
     bsl::vector<Lexer_SubpatternRecord>               d_subpatterns;  // const
-    int                                               d_generation;
 
   public:
     // TRAITS
@@ -90,11 +89,10 @@ class Lexer {
     int operator()(bsl::vector<LexerToken>  *output,
                    const bslstl::StringRef&  input,
                    bsl::ostream&             errorStream);
-        // Lex tokens from the specified 'input' and put the resulting sequence
-        // into the specified 'output'. If an error occurs, print a diagnostic
-        // to the specified 'errorStream'. Return zero on success or a nonzero
-        // value if an error occurs. Note that this function may be called
-        // multiple times.
+        // Load into the specified 'output' tokens read from the specified
+        // 'input'. If an error occurs, print a diagnostic to the specified
+        // 'errorStream'. Return zero on success or a nonzero value if an error
+        // occurs. Note that this function may be called multiple times.
 };
 
 }  // close package namespace

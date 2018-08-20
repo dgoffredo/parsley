@@ -26,14 +26,14 @@ void prepare(bdlpcre::RegEx *regex)
         bsl::cerr << "bdlpcre::RegEx::prepare returned error code " << rc
                   << " with the message: " << error
                   << "\nError occurred at offset " << errorOffset
-                  << " of the pattern: " << k_PATTERN << '\n';
+                  << " of the pattern: " << k_PATTERN << bsl::endl;
     }
 
     BSLS_ASSERT(rc == 0);
 }
 
-void enumerationSubpatterns(bsl::vector<Lexer_SubpatternRecord> *subpatterns,
-                            const bdlpcre::RegEx&                regex)
+void enumerateSubpatterns(bsl::vector<Lexer_SubpatternRecord> *subpatterns,
+                          const bdlpcre::RegEx&                regex)
 { 
     BSLS_ASSERT(subpatterns);
 
@@ -127,7 +127,6 @@ Lexer::Lexer(bslma::Allocator *basicAllocator)
 : d_regex(basicAllocator)
 , d_matches(basicAllocator)
 , d_subpatterns(basicAllocator)
-, d_generation(0)
 {
     prepare(&d_regex);
     enumerateSubpatterns(&d_subpatterns);
