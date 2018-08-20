@@ -219,11 +219,10 @@
 
 (define (class-category rule)
   (match rule
-    [(rule/class name pattern bindings)
-     (let* ([paths (map second bindings)]
-            [prefix-path (apply common-prefix paths)]
-            [subtree (follow-path prefix-path pattern)])
-       (match subtree
+    [(rule/class name pattern (list (list binding-names binding-paths) ...))
+     (let* ([prefix-path             (apply common-prefix binding-paths)]
+            [nearest-common-ancestor (follow-path prefix-path pattern)])
+       (match nearest-common-ancestor
          [(list 'Alternation _ ...)
           ; If all of the following are true:
           ; - the most recent common ancestor is an Alternation,
@@ -242,15 +241,13 @@
                                         pattern)))
               ; types as calculated from just below the common ancestor are not
               ; #:array or #:nullable
-              (for/and ([binding bindings])
-                (match binding
-                  [(list name path)
-                   (match (binding-type 
-                            name 
-                            (after-prefix prefix-path path pattern))
-                     [`(#:array ,_)    #f]
-                     [`(#:nullable ,_) #f]
-                     [_                #t])])))
+              (for/and ([name binding-names] [path binding-paths])
+                (match (binding-type 
+                         name 
+                         (after-prefix prefix-path path pattern))
+                  [`(#:array ,_)    #f]
+                  [`(#:nullable ,_) #f]
+                  [_                #t])))
             ; The above is true, so this is a choice.
             'choice
             ; The above is not true, so this is a sequence.
