@@ -1,4 +1,4 @@
-#lang at-exp racket
+#lang racket
 
 (provide lex)
 
@@ -6,41 +6,29 @@
          threading
          brag/support)
 
-(struct re (pattern) #:transparent)
-
 (define (pregexp-alternation . args)
-  ; This procedure is meant to be used with the @ reader syntax. It takes a
-  ; list of arguments produced by @pregexp-alternation{...} syntax and
-  ; discards any that are not `re` structs . The patterns within those `re`
-  ; structs are then joined together separated by "|" before invoking pregexp
-  ; on the resulting string, so that the of this procedure is a regular
-  ; expression that is an alternation of subpatterns in the originally
-  ; specified @ syntax text. Non-lists are ignored so that they can appear in
-  ; the @ syntax as comments, e.g.
-  ;     @pregexp-alternation{@list{1st pattern} ignored @list{2nd pattern}}
-  ; yields
-  ;     (pregexp "1st pattern|2nd pattern")
   (~>> args
-    (filter re?)
-    (map (match-lambda [(re pattern) (string-append "(" pattern ")")]))
+    (map (lambda (pattern) (string-append "(" pattern ")")))
     (string-join _ "|")
     pregexp))
 
 (define get-token
-  (let ([regex @pregexp-alternation{
-           @re{['0-9a-zA-Z_\-]+}    IDENTIFIER
-           @re{"(([^\\"]|\\.)*)"}   STRING
-           @re{/(([^\\/]|\\.)*)/}   REGEX
-           @re{\(\)}                EMPTY
-           @re{(?m:#(.*)$)}         COMMENT
-           @re{@"\\s*\n\\s*\n\\s*"} BLANK_LINE
-           @re{\s+(?=\S)}           WS_LEFT
-           @re{\s+$}                WS_END
-           @re{::=|[:|*?+()\.]}     other]}])
+  (let ([regex (pregexp-alternation
+           "['0-9a-zA-Z_\\-]+"        ; IDENTIFIER
+           "\"(([^\\\\\"]|\\\\.)*)\"" ; STRING
+           "/(([^\\\\/]|\\\\.)*)/"    ; REGEX
+           "\\(\\)"                   ; EMPTY
+           "(?m:#(.*)$)"              ; COMMENT
+           "\\s*\n\\s*\n\\s*"         ; BLANK_LINE
+           "\\s+(?=\\S)"              ; WS_LEFT
+           "\\s+$"                    ; WS_END
+           "::=|[:|*?+()\\.]")])      ; other
     (lambda (in)
+      "Read a token from the specified input port."
       (~>> in (regexp-try-match regex) matches->utf-8 matches->token))))
 
 (define (matches->utf-8 regex-groups)
+  "Convert any match results in the specified groups from bytes into utf-8."
   (match regex-groups
     [#f #f]
     [(list items ...)
