@@ -6,12 +6,14 @@ Term  ::=  identifier:IDENTIFIER
         |  selection:Selection
 
 Function  ::=  
-    name:IDENTIFIER 
+    name:FunctionName
     ("(" (args:Argument (SEPARATOR args:Argument)*)? ")")
 
+enumeration FunctionName  ::=  "MIN"+ | "MAX" | "AVG" | "FIRST" | "LAST"
+
 Argument  ::= identifier:IDENTIFIER
-            |  stringLiteral:STRING
-            |  integer:INTEGER
+           |  stringLiteral:STRING
+           |  integer:INTEGER
 
 Selection  ::=  array:IDENTIFIER "[" index:INTEGER "]"
 

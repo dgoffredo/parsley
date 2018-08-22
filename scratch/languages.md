@@ -82,7 +82,8 @@ Lang:2
 ------
 This language is a series of categorized rules, where tree paths have been
 calculated for bindings, modifiers (such as "ignore" or "integer") have been
-extracted from terminals, but types have not yet been analyzed.
+extracted from terminals, but types have not yet been analyzed. "Plus"
+operators have been compiled out.
 ```racket
 (list
  (rule/class

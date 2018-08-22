@@ -65,7 +65,7 @@ Those will form the set of tokens. Give the anonymous ones names:
 
 Then the grammar is:
 
-    Path  ::=  terms:(Term (FSLASH Term)*)
+    Path  ::=  terms:Term (FSLASH terms:Term)*
     
     Term  ::=  identifier:IDENTIFIER
            |   wildcard:STAR
@@ -73,9 +73,27 @@ Then the grammar is:
            |   selection:Selection
     
     Function  ::=  
-        name:IDENTIFIER 
-        args:(LPAREN (Argument (SEPARATOR Argument)*)? RPAREN)
-    
+        name:Func
+        LPAREN (args:Argument (SEPARATOR args:Argument)*)? RPAREN
+
     Argument  ::= identifier:IDENTIFIER
                |  stringLiteral:STRING
                |  integer:INTEGER
+
+    enumeration Func  ::=  "AVG" | "MIN" | "MAX"
+
+How would enums work?
+
+    Fish  ::=  "<" name:ID "," waterness:WATERNESS "," color:COLOR ">"
+
+    enumeration WATERNESS  ::=  /fresh|salt/
+
+    enumeration COLOR  ::=  "RED" | "GREEN" | "BLUE" | "URNGE"
+
+    ignore WHITESPACE  ::=  /\s+/
+
+    ID  ::=  /[a-zA-Z0-9_\-?*&^%$#@!]+/
+
+e.g.
+
+    <Nemo, SALT, URNGE>

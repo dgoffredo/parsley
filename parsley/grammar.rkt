@@ -8,7 +8,9 @@ Pattern  ::=  Alternation
           |   Concatenation
           |   @PatternTerm
 
-Alternation  ::=  @PatternTerm (/"|" @PatternTerm)+
+Alternation  ::=  @Alternate (/"|" @Alternate)+
+
+Alternate  ::=  Concatenation | @PatternTerm
 
 Concatenation  ::=  @PatternTerm+
 
@@ -18,7 +20,6 @@ PatternTerm  ::=  @BasicTerm
               |   Star
               |   Plus
               |   Question
-              |   Concatenation
 
 BasicTerm  ::=  STRING
             |   REGEX
