@@ -5,7 +5,8 @@ Term  ::=  wildcard:"*"
         |  selection:Selection
         |  identifier:IDENTIFIER
 
-Function  ::=  
+Function  ::=
+    Nonsense*
     name:FunctionName "(" (args:Argument (SEPARATOR args:Argument)*)? ")"
 
 enumeration FunctionName  ::=  "MIN" | "MAX" | "AVG" | "FIRST" | "LAST"
@@ -15,6 +16,8 @@ Argument  ::= identifier:IDENTIFIER
            |  integer:INTEGER
 
 Selection  ::=  array:IDENTIFIER "[" index:INTEGER "]"
+
+Nonsense  ::=  "(*" "*)"
 
 IDENTIFIER  ::=  /[a-zA-Z_][0-9a-zA-Z_]*/
 

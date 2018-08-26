@@ -2,11 +2,13 @@
 
 (require "sandbox.rkt"
          "key-view.rkt"
+         "mark-and-sweep.rkt"
+         graph
          threading
          srfi/1
          racket/generator)
 
-(define-for-syntax debugging? #t)
+(define-for-syntax debugging? #f)
 
 (define-syntax (debug stx)
   (syntax-case stx ()
@@ -16,6 +18,9 @@
        #'(begin
            (displayln (~a args ...) (current-error-port))
            (sleep 0.5)))]))
+
+(define-syntax-rule (debug* form)
+  (debug 'form ": " form))
 
 (define-syntax-rule (define-tree-transformer name clauses ...)
   (define (name tree)
@@ -36,6 +41,18 @@
 (define-tree-transformer remove-question
   [`(Question ,pattern)
    `(Alternation ,(remove-question pattern) ())])
+
+(define (inline-others rules [name->rule (key-by rule/base-name rules)])
+  (define-tree-transformer transform
+    [(list 'Bound _ pattern)
+     (transform pattern)]
+    [(? symbol? name) (=> pass)
+     (match (dict-ref name->rule name)
+       [(rule/other _ pattern) pattern]
+       [_ (pass)])])
+
+  (for/list ([rule rules] #:when (not (rule/other? rule)))
+    (replace-pattern rule transform)))
 
 (define (alternation/concatenation? symbol)
   (member symbol '(Alternation Concatenation)))
@@ -387,10 +404,10 @@
    that might be bound in class rules. Raise a user error if a type mismatch is
    found; otherwise, return @var{rules}."
   (let ([class/enum-names
-         (for/set ([rule (filter rule/complex? rules)])
+         (for/set ([rule rules] #:when (rule/complex? rule))
            (rule/base-name rule))]
         [terminal->type
-         (for/hash ([rule (filter rule/terminal? rules)])
+         (for/hash ([rule rules] #:when (rule/terminal? rule))
            (values (rule/base-name rule) (terminal-type rule)))])
     (for ([rule rules])
       (when (rule/class? rule)
@@ -408,16 +425,30 @@
          (rule/terminal name pattern (assert-terminal-modifier name modifier))
          (let ([bindings (binding-paths pattern)])
            (cond
-             ; If it has bindings, then it's a class.
-             [(not (empty? bindings)) 
+             ; If it has bindings, then it's a class, and it better not have
+             ; any modifiers.
+             [(not (empty? bindings))
+              (unless (empty? modifiers)
+                (raise-user-error
+                  (~a "Rule named " (qt name) " looks like a class because it "
+                    "has bindings " (map first bindings) ", yet it has "
+                    "modifier " (qt (first modifier)) ". A class cannot have "
+                    "a modifier.")))
               (rule/class name pattern bindings)]
              ; If it's declared as an enumeration, then it's an enumeration.
              [(equal? modifier 'enumeration)
               (rule/enumeration name 
                                 pattern 
                                 (enumeration-strings name pattern))]
-             ; Otherwise, it's an other.
-             [else (rule/other name pattern)]))))]))
+             ; Otherwise, it's an other, and it better not have modifiers.
+             [else
+              (unless (empty? modifiers)
+                (raise-user-error
+                  (~a "Rule named " (qt name) " does not look like a terminal "
+                    "(a terminal is just a string literal or a regular "
+                    "expression), but it has modifier " (qt (first modifiers))
+                    ". Only terminals and enumerations may have a modifier.")))
+              (rule/other name pattern)]))))]))
 
 (define (follow-path path tree)
   (for/fold ([tree tree]) ([index path])
@@ -487,4 +518,47 @@
             'sequence)]
          ; The common ancestor is not an Alternation, so this is a sequence.
          [_ 'sequence]))]))
-                 
+
+; Input language: "others" have been inlined, terminals have been extracted.
+(define (dependency-list rules)
+  "Return a list of edges (list A B), where A and B are rule names, and an edge
+   (list A B) indicates that A depends upon B, i.e. B is referenced in the
+   pattern of A."
+  (sequence->list
+    (in-generator
+      (for ([rule rules] #:when (rule/complex? rule))
+        (match rule
+          [(rule/complex name rule-pattern)
+            (let recur ([tree rule-pattern])
+              (match tree
+                [(? symbol? dependency)
+                (let ([edge (list name dependency)])
+                  (debug* edge)
+                  (yield edge))]
+                [(list 'Bound _ pattern) (recur pattern)]
+                [(list _ patterns ...) (for-each recur patterns)]))])))))
+
+(define (dependency-graph rules)
+  "Return a directed graph whose vertices are the names of rules and whose
+   edges A -> B indicate that rule A depends upon B, i.e. B is referenced in
+   the pattern of A."
+   (let ([graph (directed-graph (dependency-list rules))])
+     ; Now that all of the edges are in, add each rule name as a vertex. Any
+     ; vertices mentioned in the edges, above, will have already been added,
+     ; but there might be isolated vertices that weren't included. Adding a
+     ; vertex is idempotent.
+     (for ([rule rules])
+       (add-vertex! graph (rule/base-name rule)))
+
+     graph))
+
+(define (remove-unreachable rules)
+  "Return a list of rules that is a copy of the specified @var{rules} having
+   had removed from it all rules that are not depended upon by some class or
+   enumeration."
+  (let* ([graph (dependency-graph rules)]
+         [roots (~>> rules (filter rule/complex?) (map rule/base-name))]
+         [garbage (list->set (mark-and-sweep* graph roots))]
+         [keep? (lambda (rule)
+                  (not (set-member? garbage (rule/base-name rule))))])
+    (filter keep? rules)))
