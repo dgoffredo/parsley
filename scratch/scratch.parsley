@@ -1,15 +1,14 @@
 Path  ::=  (schema:IDENTIFIER ":" "//"?)? terms:Term ("/" terms:Term)*
 
-Term  ::=  identifier:IDENTIFIER
-        |  wildcard:"*"
+Term  ::=  wildcard:"*"
         |  function:Function
         |  selection:Selection
+        |  identifier:IDENTIFIER
 
 Function  ::=  
-    name:FunctionName
-    ("(" (args:Argument (SEPARATOR args:Argument)*)? ")")
+    name:FunctionName "(" (args:Argument (SEPARATOR args:Argument)*)? ")"
 
-enumeration FunctionName  ::=  "MIN"+ | "MAX" | "AVG" | "FIRST" | "LAST"
+enumeration FunctionName  ::=  "MIN" | "MAX" | "AVG" | "FIRST" | "LAST"
 
 Argument  ::= identifier:IDENTIFIER
            |  stringLiteral:STRING
@@ -24,3 +23,5 @@ integer INTEGER  ::=  /0|[1-9][0-9]*/
 STRING  ::=  /"([^\\]|\\.)*"/
 
 SEPARATOR  ::=  /\s*,\s*/
+
+BOGEY  ::=  "totally not used anywhere"

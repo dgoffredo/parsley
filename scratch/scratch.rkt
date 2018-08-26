@@ -1,8 +1,10 @@
 #lang racket
 
 (require "sandbox.rkt"
+         "key-view.rkt"
          threading
-         srfi/1)
+         srfi/1
+         racket/generator)
 
 (define-for-syntax debugging? #t)
 
@@ -48,7 +50,7 @@
 
 (define (terminal-type rule)
   (match rule
-    [(rule/terminal _ modifier _)
+    [(rule/terminal _ _ modifier)
      (case modifier
        [(ignore #f) (basic 'string)]      ; ignored/default terminal -> string
        [else        (basic modifier)])])) ; type-annotated terminal -> the type
@@ -57,7 +59,6 @@
 ; - (Plus expr) has been transformed into (Concatenation expr (Star expr))
 ; - (Question expr) has been transformed into (Alternation expr '())
 
-; TODO: First make sure the types of all instances of each binding are the same.
 (define (binding-type binding tree)
   (let recur ([tree tree])
     (match tree
@@ -126,6 +127,16 @@
 
       ;; other
 
+      [(list 'Question _ ...)
+       (raise-arguments-error 'binding-type
+         "Pattern (tree) must not contain any Question nodes."
+         "tree" tree)]
+
+      [(list 'Plus _ ...)
+       (raise-arguments-error 'binding-type
+         "Pattern (tree) must not contain any Plus nodes."
+         "tree" tree)]
+
       ; - otherwise, n/a
       [_
        (debug "other" ": " tree) 
@@ -160,16 +171,133 @@
 
       [_ binding-paths])))
 
-(struct rule/terminal    (name modifier pattern)  #:transparent)
-(struct rule/class       (name pattern bindings)  #:transparent)
-(struct rule/enumeration (name strings)           #:transparent)
-(struct rule/other       (name pattern)           #:transparent)
+(struct rule/base        (name pattern)       #:transparent)
+(struct rule/terminal    rule/base    (modifer)  #:transparent)
+(struct rule/other       rule/base    ()         #:transparent)
+(struct rule/complex     rule/base    ()         #:transparent)
+(struct rule/class       rule/complex (bindings) #:transparent)
+(struct rule/enumeration rule/complex (strings)  #:transparent)
+
+(define (replace-pattern rule value-or-procedure)
+  ; Return a copy of @var{rule} that has had its pattern replace by the
+  ; specified value if @var{value-or-procedure} is not a procedure, or
+  ; otherwise has had its pattern transformed by the procedure
+  ; @var{value-or-procedure}. If @var{pattern-or-procedure} is a procedure,
+  ; then it must take a pattern as its one argument and produce a pattern.
+  (if (procedure? value-or-procedure)
+    (replace-pattern rule (value-or-procedure (rule/base-pattern rule)))
+    (let ([new-pattern value-or-procedure])
+      (match rule
+        [(rule/terminal    name pattern     modifier)
+         (rule/terminal    name new-pattern modifier)]
+        [(rule/class       name pattern     bindings)
+         (rule/class       name new-pattern bindings)]
+        [(rule/enumeration name pattern     strings)
+         (rule/enumeration name new-pattern strings)]
+        [(rule/other       name             pattern)
+         (rule/other       name             new-pattern)]))))
 
 (define (terminal-pattern? pattern)
   (match pattern 
     [(? string? _)   #t]
     [(list 'regex _) #t]
     [_ #f]))
+
+(define (make-counter from)
+  (generator ()
+    (let recur ([value from])
+      (yield value)
+      (recur (+ 1 value)))))
+
+(define (unique-terminal-name names counter)
+  (let recur ([name (string->symbol (~a "TOKEN_" (counter)))])
+    (if (set-member? names name) ; already taken?
+      (recur names)              ; re-roll
+      name)))                    ; found a unique name
+
+(define (extract-terminals-from-pattern 
+           pattern counter rules name->rule pattern->terminal)
+  "Inspect the specified @var{pattern}. For each distinct literal (string or
+   regular expression) for which there is no corresponding terminal rule (as
+   determined by lookup in @var{pattern->terminal}), create a new terminal
+   rule. Use the specified @var{name->rule} to ensure that the name of the
+   created rule is not already taken. Return three values:
+   - the specified @var{rules} extended by any terminal rules created,
+   - @var{name->rule} extended by any terminal rules created,
+   - and @var{pattern->terminal} extended by any terminal rules created."
+   (let recur ([rules rules] 
+               [name->rule name->rule] 
+               [pattern->terminal pattern->terminal]
+               [tree pattern])
+     (match tree
+       [(? terminal-pattern? pattern)
+        (if (not (dict-ref pattern->terminal pattern #f))
+          ; Discovered a novel terminal literal. Make it a rule.
+          (let* ([name (unique-terminal-name (key-view name->rule) counter)]
+                 [rule (rule/terminal name pattern #f)])
+            (values (cons rule rules)
+                    (dict-set name->rule name rule)
+                    (dict-set pattern->terminal pattern rule)))
+          ; Found a terminal that already has an associated rule. Move along.
+          (values rules name->rule pattern->terminal))]
+       [(list _ children ...)
+        ; Not a leaf of the pattern tree. Fold over the children of this node.
+        (for/fold ([rules rules] 
+                   [name->rule name->rule] 
+                   [pattern->terminal pattern->terminal])
+                  ([child children])
+          (recur rules name->rule pattern->terminal child))]
+       [otherwise
+        ; Non-terminal leaf. Must be the name of another rule. Move along.
+        (values rules name->rule pattern->terminal)])))
+
+(define (key-by accessor entries)
+  (for/hash ([entry entries])
+    (values (accessor entry) entry)))
+
+(define (replace-literals-with-terminals pattern pattern->terminal)
+  (define-tree-transformer transform
+    [(? terminal-pattern? pattern)
+     (rule/base-name (dict-ref pattern->terminal pattern))])
+
+  (transform pattern))
+
+(define (extract-terminals rules)
+  "Return an extended version of the specified list of @var{rules}, where
+   each literal string or regular expression appearing within the patterns of
+   non-terminal rules has been given a name and its own (terminal) rule, and
+   all references to the terminal literal have been replaced with its name."
+  ; First, get the extended list of rules by extracting terminal literals from
+  ; rule patterns.
+  (let ([new-name-counter (make-counter 1)]) ; generates integers for new names
+    (let-values
+      ([(extended-rules name->rule pattern->terminal)
+        (for/fold ([extended-rules rules]
+                   [name->rule
+                    (key-by rule/base-name rules)]
+                   [pattern->terminal
+                    (key-by rule/base-pattern (filter rule/terminal? rules))])
+                  ([rule rules])
+          (extract-terminals-from-pattern 
+            (rule/base-pattern rule)
+            new-name-counter
+            extended-rules
+            name->rule
+            pattern->terminal))])
+      ; Then, go through the non-terminal rule patterns and replace instances of
+      ; terminal literals with the name of the corresponding terminal rule.
+      ; Return the complete list of rules (terminals and non-terminals), where
+      ; now patterns within non-terminal rules do not contain any literals --
+      ; only references to other rules.
+      (let-values ([(terminals non-terminals)
+                    (partition rule/terminal? extended-rules)])
+        (append 
+          terminals
+          (for/list ([rule non-terminals])
+            (replace-pattern rule
+              (lambda (pattern) 
+                (replace-literals-with-terminals pattern pattern->terminal
+)))))))))
 
 (define (enumeration-strings name pattern)
   "Return a list of the string values associated with the enumeration having
@@ -259,17 +387,11 @@
    that might be bound in class rules. Raise a user error if a type mismatch is
    found; otherwise, return @var{rules}."
   (let ([class/enum-names
-         (for/fold ([names (set)]) ([rule rules])
-           (match rule
-             [(or (rule/class name _ _) (rule/enumeration name _))
-              (set-add names name)]
-             [_ names]))]
+         (for/set ([rule (filter rule/complex? rules)])
+           (rule/base-name rule))]
         [terminal->type
-         (for/fold ([name->type (hash)]) ([rule rules])
-           (match rule
-             [(rule/terminal name _ _)
-              (hash-set name->type name (terminal-type rule))]
-             [_ name->type]))])
+         (for/hash ([rule (filter rule/terminal? rules)])
+           (values (rule/base-name rule) (terminal-type rule)))])
     (for ([rule rules])
       (when (rule/class? rule)
         (verify-binding-consistency-for-class rule 
@@ -283,7 +405,7 @@
      (let ([modifier (validate-modifier name modifiers)])
        (if (terminal-pattern? pattern)
          ; If it's a terminal, it's a terminal.
-         (rule/terminal name (assert-terminal-modifier name modifier) pattern)
+         (rule/terminal name pattern (assert-terminal-modifier name modifier))
          (let ([bindings (binding-paths pattern)])
            (cond
              ; If it has bindings, then it's a class.
@@ -291,7 +413,9 @@
               (rule/class name pattern bindings)]
              ; If it's declared as an enumeration, then it's an enumeration.
              [(equal? modifier 'enumeration)
-              (rule/enumeration name (enumeration-strings name pattern))]
+              (rule/enumeration name 
+                                pattern 
+                                (enumeration-strings name pattern))]
              ; Otherwise, it's an other.
              [else (rule/other name pattern)]))))]))
 
