@@ -8,7 +8,7 @@
          srfi/1
          racket/generator)
 
-(define-for-syntax debugging? #f)
+(define-for-syntax debugging? #t)
 
 (define-syntax (debug stx)
   (syntax-case stx ()
@@ -17,7 +17,7 @@
        #'(void)
        #'(begin
            (displayln (~a args ...) (current-error-port))
-           (sleep 0.5)))]))
+           (sleep 0.25)))]))
 
 (define-syntax-rule (debug* form)
   (debug 'form ": " form))
@@ -44,8 +44,8 @@
 
 (define (inline-others rules [name->rule (key-by rule/base-name rules)])
   (define-tree-transformer transform
-    [(list 'Bound _ pattern)
-     (transform pattern)]
+    [(list 'Bound name pattern)
+     (list 'Bound name (transform pattern))]
     [(? symbol? name) (=> pass)
      (match (dict-ref name->rule name)
        [(rule/other _ pattern) pattern]
@@ -76,13 +76,28 @@
 ; - (Plus expr) has been transformed into (Concatenation expr (Star expr))
 ; - (Question expr) has been transformed into (Alternation expr '())
 
-(define (binding-type binding tree)
+(define (bound-pattern-type pattern name->rule)
+  (debug* (dict-keys name->rule))
+  (match (dict-ref name->rule pattern)
+    [(rule/terminal name _ modifier)
+     (case modifier
+       [(ignore) (raise-user-error
+                   (~a "The terminal " (qt name) " appears in a binding, but "
+                     "is marked \"ignored\". Ignored terminals may not be "
+                     "bound."))]
+       [(#f) (basic 'string)]    ; If nothing was specified, it's a string.
+       [else (basic modifier)])] ; If a type was specified, that's it.
+    [(rule/complex name _)
+     (complex name)]))           ; If name maps to some class or enum, use it.
+
+(define (binding-type-relative-to binding tree name->rule)
+  "TODO"
   (let recur ([tree tree])
     (match tree
       ; a leaf of the binding
       [`(Bound ,(== binding) ,bound-pattern)
        (debug "Bound ..." ": " tree)
-       (scalar bound-pattern)]
+       (scalar (bound-pattern-type bound-pattern name->rule))]
   
       ;; combination rules
       
@@ -193,7 +208,12 @@
 (struct rule/other       rule/base    ()         #:transparent)
 (struct rule/complex     rule/base    ()         #:transparent)
 (struct rule/class       rule/complex (bindings) #:transparent)
-(struct rule/enumeration rule/complex (strings)  #:transparent)
+(struct rule/enumeration rule/complex (values)  #:transparent)
+
+(struct schema/base        (name rule)                 #:transparent)
+(struct schema/sequence    schema/base (element-types) #:transparent)
+(struct schema/choice      schema/base (element-types) #:transparent)
+(struct schema/enumeration schema/base (values)        #:transparent)
 
 (define (replace-pattern rule value-or-procedure)
   ; Return a copy of @var{rule} that has had its pattern replace by the
@@ -209,8 +229,8 @@
          (rule/terminal    name new-pattern modifier)]
         [(rule/class       name pattern     bindings)
          (rule/class       name new-pattern bindings)]
-        [(rule/enumeration name pattern     strings)
-         (rule/enumeration name new-pattern strings)]
+        [(rule/enumeration name pattern     values)
+         (rule/enumeration name new-pattern values)]
         [(rule/other       name             pattern)
          (rule/other       name             new-pattern)]))))
 
@@ -316,13 +336,13 @@
                 (replace-literals-with-terminals pattern pattern->terminal
 )))))))))
 
-(define (enumeration-strings name pattern)
+(define (enumeration-values name pattern)
   "Return a list of the string values associated with the enumeration having
    the specified rule @var{pattern}. Raise a user error if the @var{pattern}
    is not consistent with that of an enumeration. The specified rule
    @var{name} is used in diagnostics only."
   (match pattern
-    [(list 'Alternation (? string? strings) ...) strings]
+    [(list 'Alternation (? string? values) ...) values]
     [_ (raise-user-error 
          (~a "The rule named " (qt name) " is declared as an enumeration but "
            "does not have a pattern consistent with an enumeration. An "
@@ -439,7 +459,7 @@
              [(equal? modifier 'enumeration)
               (rule/enumeration name 
                                 pattern 
-                                (enumeration-strings name pattern))]
+                                (enumeration-values name pattern))]
              ; Otherwise, it's an other, and it better not have modifiers.
              [else
               (unless (empty? modifiers)
@@ -481,10 +501,16 @@
     (take (+ 1 (length prefix-path)))
     (follow-path tree)))
 
-(define (class-category rule)
+(define (class-category rule name->rule)
   (match rule
     [(rule/class name pattern (list (list binding-names binding-paths) ...))
-     (let* ([prefix-path             (apply common-prefix binding-paths)]
+     (let* ([with-type               (lambda (binding)
+                                       (list binding 
+                                             (binding-type-relative-to
+                                               binding pattern name->rule)))]
+            [binding-types           (map with-type 
+                                          (remove-duplicates binding-names))]
+            [prefix-path             (apply common-prefix binding-paths)]
             [nearest-common-ancestor (follow-path prefix-path pattern)])
        (match nearest-common-ancestor
          [(list 'Alternation _ ...)
@@ -506,18 +532,29 @@
               ; types as calculated from just below the common ancestor are not
               ; array or nullable
               (for/and ([name binding-names] [path binding-paths])
-                (match (binding-type 
+                (match (binding-type-relative-to
                          name 
-                         (after-prefix prefix-path path pattern))
+                         (after-prefix prefix-path path pattern)
+                         name->rule)
                   [(array _)    #f]
                   [(nullable _) #f]
                   [_            #t])))
             ; The above is true, so this is a choice.
-            'choice
+            (schema/choice name rule binding-types)
             ; The above is not true, so this is a sequence.
-            'sequence)]
+            (schema/sequence name rule binding-types))]
          ; The common ancestor is not an Alternation, so this is a sequence.
-         [_ 'sequence]))]))
+         [_ (schema/sequence name rule binding-types)]))]))
+
+(define (rules->schema-types rules [name->rule (key-by rule/base-name rules)])
+  "TODO"
+  (let ([rules (verify-binding-consistency rules)])
+    (for/list ([rule rules] #:when (rule/complex? rule))
+      (match rule
+        [(struct rule/class _) 
+         (class-category rule name->rule)]
+        [(rule/enumeration name pattern values)
+         (schema/enumeration name rule values)]))))
 
 ; Input language: "others" have been inlined, terminals have been extracted.
 (define (dependency-list rules)
@@ -533,7 +570,6 @@
               (match tree
                 [(? symbol? dependency)
                 (let ([edge (list name dependency)])
-                  (debug* edge)
                   (yield edge))]
                 [(list 'Bound _ pattern) (recur pattern)]
                 [(list _ patterns ...) (for-each recur patterns)]))])))))
