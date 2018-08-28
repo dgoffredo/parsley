@@ -63,9 +63,8 @@
 (struct array      occurrence ()     #:transparent) ; zero or more
 (struct nullable   occurrence ()     #:transparent) ; zero or one
 
-(struct kind    (name)  #:transparent) ; e.g. user-defined or builtin
-(struct basic   kind () #:transparent) ; e.g. string, integer
-(struct complex kind () #:transparent) ; user-defined type
+(struct basic   (name) #:transparent) ; e.g. string, integer
+(struct complex (name) #:transparent) ; user-defined type
 
 (define (terminal-type rule)
   (match rule
@@ -217,48 +216,56 @@
 (struct schema/choice      schema/base (element-types) #:transparent)
 (struct schema/enumeration schema/base (values)        #:transparent)
 
+(define (type-kind->name type-kind)
+  "Return an SXML namespace-qualified attribute value suitable for use in a
+   sequence or choice's \"type\" attribute, based on the specified
+   @var{type-kind}."
+  (match type-kind
+    [(basic name)   (~a 'xs: name)]
+    [(complex name) (~a 'tns: name)]))
+
 (define (type->attributes type)
   "Return a list of name/value pairs describing the type and occurence of an
    SXML sequence or choice element having the specified @var{type}. The pairs
    are suitable for inclusion in an SXML attribute list."
-  ; Since I chose to set targetNamespace to the XSD namespace, there's no need
-  ; to distinguish between complex (user-defined) and basic (builtin) types;
-  ; so, this code uses the base struct "kind" instead. If I ever get namespaces
-  ; working properly, the distinction will become important.
   (match type
-    [(scalar   (kind name)) `((type ,(~a name)))]
-    [(array    (kind name)) `((type ,(~a name)) (minOccurs "0") 
-                                                (maxOccurs "unbounded"))]
-    [(nullable (kind name)) `((type ,(~a name)) (minOccurs "0"))]))
+    [(scalar kind)   `((type ,(type-kind->name kind)))]
+    [(array kind)    `((type ,(type-kind->name kind)) 
+                       (minOccurs "0") (maxOccurs "unbounded"))]
+    [(nullable kind) `((type ,(type-kind->name kind))
+                       (minOccurs "0"))]))
 
 (define (elements->sxml element-types)
   (for/list ([element element-types])
     (match element
       [(list name type)
-       `(element (@ (name ,(~a name)) ,@(type->attributes type)))])))
+       `(xs:element (@ (name ,(~a name)) ,@(type->attributes type)))])))
 
 (define (complex-type->sxml which name element-types)
-  `(complexType (@ (name ,(~a name)))
+  `(xs:complexType (@ (name ,(~a name)))
       (,which
         ,@(elements->sxml element-types))))
 
 (define (enumeration->sxml name values)
-  `(simpleType (@ (name ,(~a name)))
+  `(xs:simpleType (@ (name ,(~a name)))
      (restriction (@ (base "string"))
        ,@(for/list ([value values])
-           `(enumeration (@ (value ,value)))))))
+           `(xs:enumeration (@ (value ,value)))))))
 
-(define (schema-types->sxml types)
+(define default-target-namespace "https://en.wikipedia.org/wiki/Parsley")
+
+(define (schema-types->sxml types [target-namespace default-target-namespace])
   `(*TOP*
-     (@ (*NAMESPACES* (xmlns "http://www.w3.org/2001/XMLSchema")))
+     (@ (*NAMESPACES* (xs "http://www.w3.org/2001/XMLSchema")
+                      (tns ,target-namespace)))
      (*PI* xml "version=\"1.0\" encoding=\"UTF-8\"")
-     (schema (@ (targetNamespace "http://www.w3.org/2001/XMLSchema"))
+     (xs:schema (@ (targetNamespace ,target-namespace))
        ,@(for/list ([type types])
            (match type
              [(schema/sequence name _ element-types)
-              (complex-type->sxml 'sequence name element-types)]
+              (complex-type->sxml 'xs:sequence name element-types)]
              [(schema/choice name _ element-types)
-              (complex-type->sxml 'choice name element-types)]
+              (complex-type->sxml 'xs:choice name element-types)]
              [(schema/enumeration name _ values)
               (enumeration->sxml name values)])))))
 
