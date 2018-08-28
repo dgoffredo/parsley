@@ -522,27 +522,33 @@
           ;   below the common ancestor is not array or nullable,
           ; then the "class category" of the rule is 'choice. Otherwise, it's
           ; 'sequence.
-          (if 
-            (and
-              ; - no Star or Alternation leading up to common ancestor
-              (or (empty? prefix-path)
-                  (not (find-along-path alternation/star? 
-                                        (drop-last prefix-path) 
-                                        pattern)))
-              ; types as calculated from just below the common ancestor are not
-              ; array or nullable
-              (for/and ([name binding-names] [path binding-paths])
-                (match (binding-type-relative-to
-                         name 
-                         (after-prefix prefix-path path pattern)
-                         name->rule)
-                  [(array _)    #f]
-                  [(nullable _) #f]
-                  [_            #t])))
-            ; The above is true, so this is a choice.
-            (schema/choice name rule binding-types)
-            ; The above is not true, so this is a sequence.
-            (schema/sequence name rule binding-types))]
+          (let ([choice-binding-types
+                 (and
+                   ; - no Star or Alternation leading up to common ancestor
+                   (or (empty? prefix-path)
+                       (not (find-along-path alternation/star? 
+                                             (drop-last prefix-path) 
+                                             pattern)))
+                   ; types as calculated from just below the common ancestor
+                   ; are not array or nullable
+                   (for/fold ([types '()])
+                             ([name binding-names] [path binding-paths])
+                     #:break (not types) ; once we hit #f, bail like for/and
+                     (match (binding-type-relative-to
+                             name 
+                             (after-prefix prefix-path path pattern)
+                             name->rule)
+                       ; array and nullable --> bad
+                       [(array _)    #f]
+                       [(nullable _) #f]
+                       ; scalar --> good
+                       [type (cons (list name type) types)])))])
+            (if choice-binding-types
+              ; The above is true, so this is a choice.
+              ; TODO: This means that calculating binding-types was a waste.
+              (schema/choice name rule choice-binding-types)
+              ; The above is not true, so this is a sequence.
+              (schema/sequence name rule binding-types)))]
          ; The common ancestor is not an Alternation, so this is a sequence.
          [_ (schema/sequence name rule binding-types)]))]))
 
