@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" targetNamespace="http://www.w3.org/2001/XMLSchema">
+  <xsd:complexType name="Grammar">
+    <xsd:sequence>
+      <xsd:element name="rules" type="xsd:Rule" minOccurs="0" maxOccurs="unbounded" />
+    </xsd:sequence>
+  </xsd:complexType>
+  <xsd:complexType name="Rule">
+    <xsd:sequence>
+      <xsd:element name="ignore" type="xsd:string" minOccurs="0" />
+      <xsd:element name="name" type="xsd:string" />
+      <xsd:element name="pattern" type="xsd:Pattern" />
+    </xsd:sequence>
+  </xsd:complexType>
+  <xsd:complexType name="Pattern">
+    <xsd:choice>
+      <xsd:element name="concatenation" type="xsd:Concatenation" />
+      <xsd:element name="alternation" type="xsd:Alternation" />
+    </xsd:choice>
+  </xsd:complexType>
+  <xsd:complexType name="Alternation">
+    <xsd:sequence>
+      <xsd:element name="patterns" type="xsd:PatternTerm" minOccurs="0" maxOccurs="unbounded" />
+    </xsd:sequence>
+  </xsd:complexType>
+  <xsd:complexType name="Concatenation">
+    <xsd:sequence>
+      <xsd:element name="patterns" type="xsd:PatternTerm" minOccurs="0" maxOccurs="unbounded" />
+    </xsd:sequence>
+  </xsd:complexType>
+  <xsd:complexType name="PatternTerm">
+    <xsd:choice>
+      <xsd:element name="unbound" type="xsd:QuantifiedPatternTerm" />
+      <xsd:element name="bound" type="xsd:BoundPatternTerm" />
+    </xsd:choice>
+  </xsd:complexType>
+  <xsd:complexType name="BoundPatternTerm">
+    <xsd:sequence>
+      <xsd:element name="name" type="xsd:string" />
+      <xsd:element name="term" type="xsd:QuantifiedPatternTerm" />
+    </xsd:sequence>
+  </xsd:complexType>
+  <xsd:complexType name="QuantifiedPatternTerm">
+    <xsd:choice>
+      <xsd:element name="term" type="xsd:UnquantifiedPatternTerm" />
+      <xsd:element name="question" type="xsd:UnquantifiedPatternTerm" />
+      <xsd:element name="plus" type="xsd:UnquantifiedPatternTerm" />
+      <xsd:element name="star" type="xsd:UnquantifiedPatternTerm" />
+    </xsd:choice>
+  </xsd:complexType>
+  <xsd:complexType name="UnquantifiedPatternTerm">
+    <xsd:choice>
+      <xsd:element name="pattern" type="xsd:Pattern" />
+      <xsd:element name="empty" type="xsd:string" />
+      <xsd:element name="rule" type="xsd:string" />
+      <xsd:element name="regex" type="xsd:string" />
+      <xsd:element name="literal" type="xsd:string" />
+    </xsd:choice>
+  </xsd:complexType>
+</xsd:schema>
