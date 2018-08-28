@@ -8,7 +8,7 @@
          srfi/1
          racket/generator)
 
-(define-for-syntax debugging? #t)
+(define-for-syntax debugging? #f)
 
 (define-syntax (debug stx)
   (syntax-case stx ()
@@ -588,6 +588,11 @@
 
      graph))
 
+(define (ignored-terminal? rule)
+  (match rule
+    [(rule/terminal _ _ 'ignore) #t]
+    [_ #f]))
+
 (define (remove-unreachable rules)
   "Return a list of rules that is a copy of the specified @var{rules} having
    had removed from it all rules that are not depended upon by some class or
@@ -596,5 +601,9 @@
          [roots (~>> rules (filter rule/complex?) (map rule/base-name))]
          [garbage (list->set (mark-and-sweep* graph roots))]
          [keep? (lambda (rule)
-                  (not (set-member? garbage (rule/base-name rule))))])
+                  ; If the rule is not garbage, then keep it. Make a special
+                  ; exception for ignored terminals, which while not referenced
+                  ; by anything, should still be kept.
+                  (or (not (set-member? garbage (rule/base-name rule)))
+                      (ignored-terminal? rule)))])
     (filter keep? rules)))
