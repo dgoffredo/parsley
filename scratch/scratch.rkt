@@ -3,6 +3,7 @@
 (require "sandbox.rkt"
          "key-view.rkt"
          "mark-and-sweep.rkt"
+         sxml
          graph
          threading
          srfi/1
@@ -62,8 +63,9 @@
 (struct array      occurrence ()     #:transparent) ; zero or more
 (struct nullable   occurrence ()     #:transparent) ; zero or one
 
-(struct basic   (name) #:transparent) ; e.g. string, integer
-(struct complex (name) #:transparent) ; user-defined type
+(struct kind    (name)  #:transparent) ; e.g. user-defined or builtin
+(struct basic   kind () #:transparent) ; e.g. string, integer
+(struct complex kind () #:transparent) ; user-defined type
 
 (define (terminal-type rule)
   (match rule
@@ -215,12 +217,57 @@
 (struct schema/choice      schema/base (element-types) #:transparent)
 (struct schema/enumeration schema/base (values)        #:transparent)
 
+(define (type->attributes type)
+  "Return a list of name/value pairs describing the type and occurence of an
+   SXML sequence or choice element having the specified @var{type}. The pairs
+   are suitable for inclusion in an SXML attribute list."
+  ; Since I chose to set targetNamespace to the XSD namespace, there's no need
+  ; to distinguish between complex (user-defined) and basic (builtin) types;
+  ; so, this code uses the base struct "kind" instead. If I ever get namespaces
+  ; working properly, the distinction will become important.
+  (match type
+    [(scalar   (kind name)) `((type ,(~a name)))]
+    [(array    (kind name)) `((type ,(~a name)) (minOccurs "0") 
+                                                (maxOccurs "unbounded"))]
+    [(nullable (kind name)) `((type ,(~a name)) (minOccurs "0"))]))
+
+(define (elements->sxml element-types)
+  (for/list ([element element-types])
+    (match element
+      [(list name type)
+       `(element (@ (name ,(~a name)) ,@(type->attributes type)))])))
+
+(define (complex-type->sxml which name element-types)
+  `(complexType (@ (name ,(~a name)))
+      (,which
+        ,@(elements->sxml element-types))))
+
+(define (enumeration->sxml name values)
+  `(simpleType (@ (name ,(~a name)))
+     (restriction (@ (base "string"))
+       ,@(for/list ([value values])
+           `(enumeration (@ (value ,value)))))))
+
+(define (schema-types->sxml types)
+  `(*TOP*
+     (@ (*NAMESPACES* (xmlns "http://www.w3.org/2001/XMLSchema")))
+     (*PI* xml "version=\"1.0\" encoding=\"UTF-8\"")
+     (schema (@ (targetNamespace "http://www.w3.org/2001/XMLSchema"))
+       ,@(for/list ([type types])
+           (match type
+             [(schema/sequence name _ element-types)
+              (complex-type->sxml 'sequence name element-types)]
+             [(schema/choice name _ element-types)
+              (complex-type->sxml 'choice name element-types)]
+             [(schema/enumeration name _ values)
+              (enumeration->sxml name values)])))))
+
 (define (replace-pattern rule value-or-procedure)
-  ; Return a copy of @var{rule} that has had its pattern replace by the
-  ; specified value if @var{value-or-procedure} is not a procedure, or
-  ; otherwise has had its pattern transformed by the procedure
-  ; @var{value-or-procedure}. If @var{pattern-or-procedure} is a procedure,
-  ; then it must take a pattern as its one argument and produce a pattern.
+  "Return a copy of @var{rule} that has had its pattern replace by the
+   specified value if @var{value-or-procedure} is not a procedure, or
+   otherwise has had its pattern transformed by the procedure
+   @var{value-or-procedure}. If @var{pattern-or-procedure} is a procedure,
+   then it must take a pattern as its one argument and produce a pattern."
   (if (procedure? value-or-procedure)
     (replace-pattern rule (value-or-procedure (rule/base-pattern rule)))
     (let ([new-pattern value-or-procedure])
