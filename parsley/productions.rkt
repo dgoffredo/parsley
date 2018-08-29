@@ -1,18 +1,22 @@
 #lang racket
 
-(require "key-view.rkt"
+(provide get-productions
+         (struct-out productions))
+
+(require "types.rkt"
+         "key-view.rkt"
          "mark-and-sweep.rkt"
          graph
          threading
          srfi/1
          racket/generator)
 
-; this struct contains the results of this module's work. "types" is a list
+; This struct contains the results of this module's work. "types" is a list
 ; of instances of the schema/* structs, and "tokens" is a list of instances of
 ; the token struct.
 (struct productions (types tokens) #:transparent)
 
-; this struct contains all of the information necessary to lex a token and then
+; This struct contains all of the information necessary to lex a token and then
 ; handle it appropriately. "pattern" is a regular expression pattern. "type"
 ; is of the form (basic symbol?), and "ignore?" is a boolean indicating whether
 ; the parser should skip this kind of token.
@@ -115,18 +119,6 @@
 
 (define (alternation/concatenation? symbol)
   (member symbol '(Alternation Concatenation)))
-
-; These structs distinguish types the multiplicity of values they allow.
-(struct occurrence            (type) #:transparent)
-(struct scalar     occurrence ()     #:transparent) ; exactly one
-(struct array      occurrence ()     #:transparent) ; zero or more
-(struct nullable   occurrence ()     #:transparent) ; zero or one
-
-; These structs distinguish types that are user-defined, in the XSD sense, or
-; builtin.
-(struct kind    (name)  #:transparent) ; user-defined or builtin
-(struct basic   kind () #:transparent) ; e.g. string, integer
-(struct complex kind () #:transparent) ; user-defined type
 
 (define (terminal-type rule)
   "Return the (basic) type of the specified terminal @var{rule}. If its type
@@ -299,21 +291,6 @@
            (recur (cons i path-reversed) binding-paths branch)))]
 
       [_ binding-paths])))
-
-; These rule structs categorize the raw Rule nodes from the grammar parse tree.
-(struct rule/base        (name pattern)          #:transparent)
-(struct rule/terminal    rule/base    (modifer)  #:transparent)
-(struct rule/other       rule/base    ()         #:transparent)
-(struct rule/complex     rule/base    ()         #:transparent)
-(struct rule/class       rule/complex (bindings) #:transparent)
-(struct rule/enumeration rule/complex (values)   #:transparent)
-
-; These schema structs contain sufficient information to generate corresponding
-; XSD types or C++ class parsers.
-(struct schema/base        (name rule)                 #:transparent)
-(struct schema/sequence    schema/base (element-types) #:transparent)
-(struct schema/choice      schema/base (element-types) #:transparent)
-(struct schema/enumeration schema/base (values)        #:transparent)
 
 (define (replace-pattern rule value-or-procedure)
   "Return a copy of @var{rule} that has had its pattern replace by the
@@ -600,6 +577,14 @@
                     "expression), but it has modifier " (qt (first modifiers))
                     ". Only terminals and enumerations may have a modifier.")))
               (rule/other name pattern)]))))]))
+
+; These rule structs categorize the raw Rule nodes from the grammar parse tree.
+(struct rule/base        (name pattern)          #:transparent)
+(struct rule/terminal    rule/base    (modifer)  #:transparent)
+(struct rule/other       rule/base    ()         #:transparent)
+(struct rule/complex     rule/base    ()         #:transparent)
+(struct rule/class       rule/complex (bindings) #:transparent)
+(struct rule/enumeration rule/complex (values)   #:transparent)
 
 (define (follow-path path tree)
   "Return the final subtree within @var{tree} reached by visiting the i'th

@@ -2,5 +2,5 @@
 
 (provide *parsley-version*)
 
-(define *parsley-version* -96)
+(define *parsley-version* -95)
 
