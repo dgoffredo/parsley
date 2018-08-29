@@ -1,5 +1,7 @@
 Path  ::=  (schema:IDENTIFIER ":" "//"?)? terms:Term ("/" terms:Term)*
 
+# Comments look like this can we <screw><up>XML serialization?</up></screw>
+
 Term  ::=  wildcard:"*"
         |  function:Function
         |  selection:Selection
