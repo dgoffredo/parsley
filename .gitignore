@@ -1,0 +1,2 @@
+# empty file used by Makefile to remember whether it's done something
+.make-init-ran-already

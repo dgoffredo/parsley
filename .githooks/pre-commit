@@ -1,0 +1,28 @@
+#!/usr/bin/env racket
+#lang racket
+
+(require threading      ; for the ~> macro
+         racket/pretty) ; for pretty-write (wraps to 79th column, by default)
+
+; Deduce the path to "version.rkt" based on the known path to this script file.
+; Then, read the file and write a modified version of it to a temporary file,
+; where the modified version has the value of the *parsley-verion* integer
+; incremented. Then, move the temporary file to "version.rkt" (overwrite).
+(let* ([githooks-dir 
+        (~> 'run-file find-system-path path->complete-path path-only)]
+       [version-file
+        (build-path githooks-dir 'up "parsley" "version.rkt")])
+  (call-with-atomic-output-file version-file
+    (lambda (out temp-path)                         ; temp-path is ignored
+      (call-with-input-file version-file
+        (lambda (in)
+          (read-language in)                        ; read the #lang
+          (displayln "#lang racket\n" out)          ; write the #lang
+          (for ([toplevel-datum (in-port read in)]) ; read the rest
+            (pretty-write                           ; write the rest 
+              (match toplevel-datum                 ; change the version only
+                [`(define *parsley-version* ,version)
+                 `(define *parsley-version* ,(+ version 1))]
+                [other other])
+              out)
+            (newline out)))))))                     ; blank line between forms
