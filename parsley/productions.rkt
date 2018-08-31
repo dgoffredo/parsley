@@ -469,7 +469,9 @@
                         (dict-ref terminal->type bound #f)
                         (and (terminal-pattern? bound) (basic 'string))
                         (raise-user-error
-                          (~a rule-name "." name " has undefined type.")))])
+                          (~a rule-name "." name " has undefined type. Note "
+                            "that a binding must refer to either a terminal "
+                            "or to a rule that itself has bindings.")))])
                (match (hash-ref binding->type name #f)
                  [#f        (hash-set binding->type name type)] ; first time
                  [(== type) binding->type]                      ; consistent
@@ -562,25 +564,6 @@
       [(list _ subtrees ...)
        (list-ref subtrees index)])))
 
-(define (alternation/star? tree)
-  (match tree
-    [(list 'Alternation _ ...)  #t]
-    [(list 'Star _)             #t]
-    [_                          #f]))
-
-(define (after-prefix prefix-path path tree)
-  "Assuming that the list @var{prefix-path} is a prefix of @var{path}, follow
-   @var{path} in @var{tree} until one past the prefix, e.g. if
-       '(2 1)
-   is the prefix and
-       '(2 1 3 1 4 ...)
-   is the path, then follow in @var{tree} the path
-       '(2 1 3)
-   and return the resulting subtree."
-  (~> path
-    (take (+ 1 (length prefix-path)))
-    (follow-path tree)))
-
 (define (get-choice-bindings pattern name->rule)
   "Return the list of typed bindings, each a (list name type), from which
    the specified @var{pattern} will produce exactly one (not none of them
@@ -647,11 +630,18 @@
 (define (class-category rule name->rule)
   " :: rule/class -> schema/choice | schema/sequence"
   (match rule
-    [(rule/class name pattern (list (list binding-names binding-paths) ...))
+    [(rule/class name pattern (list (list binding-names _) ...))
      (match (get-choice-bindings pattern name->rule)
-       ; The pattern represents a choice among its bindings.
+       ; The pattern represents a choice among its bindings if
+       ; get-choice-bindings returns a list of bindings/types containing every
+       ; binding in this rule.
        [(list bindings ...)
-        (schema/choice name rule bindings)]
+        (=> fail)
+        (match bindings
+          [(list (list names _) ...)
+           (if (equal? (list->set names) (list->set binding-names))
+             (schema/choice name rule bindings)                     ; -> choice
+             (fail))])]
        ; The pattern is not a choice, so it'll be a sequence. Figure out what
        ; the types of its members are.
        [#f
@@ -660,10 +650,10 @@
                                   (binding-type-relative-to 
                                     binding pattern name->rule)))]
                [binding-types (~>> binding-names
-                                   remove-duplicates 
+                                   remove-duplicates
                                    (map with-type))])
-          (schema/sequence name rule binding-types))])]))
-
+          (schema/sequence name rule binding-types))])]))         ; -> sequence
+  
 (define (rules->schema-types rules)
   " :: (list (rule/class | rule/enumeration) ...)
         -> (list (schema/sequence | schema/choice | schema/enumeration) ...)"
