@@ -153,30 +153,7 @@
   "Return the full type (name and occurence) associated with the specified
    @var{binding} name as seen relative to the specified rule pattern
    @var{tree}. Use the dict @var{name->rule} in order to deduce the types of
-   other rules referenced in the @var{tree}.
-
-   This procedure has \"relative-to\" in its name because the occurrence
-   (scalar, array, or nullable) of a binding can be different as seen from
-   different parent nodes. For example, in
-       '(Concatenation A B (Alternation C (Bound foo B)))
-   foo has type
-       (nullable TB)
-   where TB stands for the type of the rule B. The reason foo is nullable is
-   that it may appear either one time in this pattern or zero times. The
-   alternation with the C rule will decide whether foo occurs or not. However,
-   if the pattern under consideration is seen from one level higher, the tree
-   might look like
-       '(Star (Concatenation A B (Alternation C (Bound foo B))))
-   This is the previous pattern but now wrapped in a Kleene star. From this
-   point of view, foo has type
-       (array TB)
-   since the star means that what is enclosed may appear zero or more times.
-   foo may appear zero or once, all zero or more times. So, overall, it can
-   appear zero or more times.
-   
-   This difference becomes important in the class-category procedure, where
-   whether a class is a sequence or a choice is determined by the types of
-   its bindings relative to different points in the pattern tree."
+   other rules referenced in the @var{tree}."
   (let recur ([tree tree])
     (match tree
       ; a leaf of the binding
@@ -258,21 +235,6 @@
       [_
        (debug "other" ": " tree) 
        '#:n/a])))
-
-(define (common-prefix . lists)
-  "e.g. 
-       (common-prefix '(1 2 3) '(1 2 6) '(1 2 3 4 5)) ; is '(1 2)
-       (common-prefix '(1 2 3) '(8 2 6) '(1 2 3 4 5)) ; is '()
-       (common-prefix '() '())                        ; is '()"
-  (reverse
-    (let recur ([common-backwards '()] [lists lists])
-      (match lists
-        [(list (cons heads tails) ...)
-         (match (remove-duplicates heads)
-           [(list common-head)
-            (recur (cons common-head common-backwards) tails)]
-           [_ common-backwards])]
-        [_ common-backwards]))))
 
 (define (binding-paths tree)
   " :: parse-tree -> (list (list name path) ...)
@@ -405,10 +367,10 @@
            (rule/terminal 'TOKEN_2 '(Regex \".*\") ...)
            (rule/terminal 'TOKEN_3 \"red\" ...)
            (rule/terminal 'TOKEN_4 \"green\" ...))"
-  ; First, get the extended list of rules by extracting terminal literals from
-  ; rule patterns.
   (let ([name->rule (key-by rule/base-name rules)] ; dict to look up rules
         [new-name-counter (make-counter 1)])       ; for making new names
+    ; First, get the extended list of rules by extracting terminal literals
+    ; from rule patterns.
     (let-values
       ([(extended-rules name->rule pattern->terminal)
         (for/fold ([extended-rules rules]
@@ -600,23 +562,6 @@
       [(list _ subtrees ...)
        (list-ref subtrees index)])))
 
-(define (drop-last lst)
-  (take lst (- (length lst) 1)))
-
-(define (find-along-path found? path tree)
-  "Visit descendents of @var{tree} as in follow-path, but at each step apply
-   @var{found?} to the subtree, and if the result is not #f, return that
-   subtree. If no subtree along the path matches, return #f."
-  (let recur ([path path] [tree tree])
-    (cond 
-      [(found? tree) tree]
-      [(empty? path) #f]
-      [else
-       (match tree 
-         [(list _ subtrees ...) 
-          (recur (rest path) (list-ref subtrees (first path)))]
-         [_ #f])])))
-
 (define (alternation/star? tree)
   (match tree
     [(list 'Alternation _ ...)  #t]
@@ -636,57 +581,88 @@
     (take (+ 1 (length prefix-path)))
     (follow-path tree)))
 
+(define (get-choice-bindings pattern name->rule)
+  "Return the list of typed bindings, each a (list name type), from which
+   the specified @var{pattern} will produce exactly one (not none of them
+   and not two or more of them), or return #f if @var{pattern} does not so
+   describe a choice."
+  (struct choice-set (binding-types-set) #:transparent)
+
+  (match
+    (let recur ([pattern pattern])
+      (match pattern
+        ; a binding is a set of one
+        [(list 'Bound name bound-pattern)
+         (debug "in Bound case with " name ": " bound-pattern)
+         (let ([type (bound-pattern-type bound-pattern name->rule)])
+           (choice-set (set (list name type))))]
+    
+        ; an alternation between only sets is their union
+        [(list 'Alternation (choice-set binding-types-sets) ...)
+         (debug "in Alternation case with the sets: " binding-types-sets)
+         (choice-set (apply set-union binding-types-sets))]
+    
+        ; a concatenation of one set with non-sets is just that same set
+        [`(Concatenation
+            ,@(list-no-order 
+                (? choice-set? choices) (? (negate choice-set?) _) ...))
+         (debug "in Concatenation case with choices: " choices)
+         choices]
+    
+        ; a star eliminates choice-ness, since it can produce more than one
+        [(list 'Star _ ...)
+         (debug "found a star")
+         #f]
+  
+        ; it's a precondition that questions and pluses are removed
+        [(list 'Question _ ...)
+         (raise-arguments-error 'pattern
+           "Pattern (tree) must not contain any Question nodes."
+           "pattern" pattern)]
+  
+        [(list 'Plus _ ...)
+         (raise-arguments-error 'pattern
+           "Pattern (tree) must not contain any Plus nodes."
+           "pattern" pattern)]
+  
+        ; if we recurred down a tree and found nothing, then nothing
+        [(list operation #f ...)
+         (debug "found an operation whose children were all #f")
+         #f]
+  
+        ; recur on down the tree
+        [(list operation args ...)
+         (debug "Recurring for operation " operation)
+         (recur (cons operation (map recur args)))]
+    
+        ; otherwise, not interested
+        [otherwise
+         (debug "In the \"otherwise\" case for: " otherwise) 
+         #f]))
+    ; A choice-set was produced. Return the list of (list binding-name type)
+    [(choice-set bindings) (set->list bindings)]
+    ; Not a choice. Return #f.
+    [_ #f]))
+
 (define (class-category rule name->rule)
   " :: rule/class -> schema/choice | schema/sequence"
   (match rule
     [(rule/class name pattern (list (list binding-names binding-paths) ...))
-     (let* ([with-type               (lambda (binding)
-                                       (list binding 
-                                             (binding-type-relative-to
-                                               binding pattern name->rule)))]
-            [binding-types           (map with-type 
-                                          (remove-duplicates binding-names))]
-            [prefix-path             (apply common-prefix binding-paths)]
-            [nearest-common-ancestor (follow-path prefix-path pattern)])
-       (match nearest-common-ancestor
-         [(list 'Alternation _ ...)
-          ; If all of the following are true:
-          ; - the most recent common ancestor is an Alternation,
-          ; - there are no Star or Alternation nodes between the common
-          ;   ancestor and root,
-          ; - the "binding type" of each binding relative to the node just
-          ;   below the common ancestor is not array or nullable,
-          ; then the "class category" of the rule is 'choice. Otherwise, it's
-          ; 'sequence.
-          (let ([choice-binding-types
-                 (and
-                   ; - no Star or Alternation leading up to common ancestor
-                   (or (empty? prefix-path)
-                       (not (find-along-path alternation/star? 
-                                             (drop-last prefix-path) 
-                                             pattern)))
-                   ; types as calculated from just below the common ancestor
-                   ; are not array or nullable
-                   (for/fold ([types '()])
-                             ([name binding-names] [path binding-paths])
-                     #:break (not types) ; once we hit #f, bail like for/and
-                     (match (binding-type-relative-to
-                             name 
-                             (after-prefix prefix-path path pattern)
-                             name->rule)
-                       ; array and nullable --> bad
-                       [(array _)    #f]
-                       [(nullable _) #f]
-                       ; scalar --> good
-                       [type (cons (list name type) types)])))])
-            (if choice-binding-types
-              ; The above is true, so this is a choice.
-              ; TODO: This means that calculating binding-types was a waste.
-              (schema/choice name rule choice-binding-types)
-              ; The above is not true, so this is a sequence.
-              (schema/sequence name rule binding-types)))]
-         ; The common ancestor is not an Alternation, so this is a sequence.
-         [_ (schema/sequence name rule binding-types)]))]))
+     (match (get-choice-bindings pattern name->rule)
+       ; The pattern represents a choice among its bindings.
+       [(list bindings ...)
+        (schema/choice name rule bindings)]
+       ; The pattern is not a choice, so it'll be a sequence. Figure out what
+       ; the types of its members are.
+       [#f
+        (let* ([with-type (lambda (binding) 
+                            (list binding 
+                                  (binding-type-relative-to 
+                                    binding pattern name->rule)))]
+               [binding-types (~>> binding-names
+                                   remove-duplicates 
+                                   (map with-type))])
+          (schema/sequence name rule binding-types))])]))
 
 (define (rules->schema-types rules)
   " :: (list (rule/class | rule/enumeration) ...)
