@@ -46,7 +46,7 @@
     [(list _ #f string inside _ #f ...)
      (token 'STRING inside)]
     [(list _ #f #f #f #f regex inside _ #f ...)
-     (token 'REGEX `(regex ,inside))]
+     (token 'REGEX `(regex ,(string-replace inside "\\/" "/")))]
     [(list _ #f #f #f #f #f #f #f empty #f ...)
      (token 'EMPTY '())]
     [(list _ #f ... comment inside #f #f #f #f)

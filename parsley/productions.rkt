@@ -20,7 +20,7 @@
 ; handle it appropriately. "pattern" is a regular expression pattern. "type"
 ; is of the form (basic symbol?), and "ignore?" is a boolean indicating whether
 ; the parser should skip this kind of token.
-(struct token (name pattern type ignore?) #:transparent)
+(struct token (name pcre-pattern type ignore?) #:transparent)
 
 (define (get-productions grammar)
   (let* ([rules
@@ -40,12 +40,22 @@
 (define (rules->tokens rules)
   (~>> rules (filter rule/terminal?) (map rule->token)))
 
+(define (escape-pcre-pattern pattern)
+  (regexp-replace* #px"[.?*+^$[\\]\\\\(){}|-]" pattern "\\\\&"))
+
+(define (regexify regex-or-string)
+  (match regex-or-string
+    [(list 'regex pcre-pattern)
+     pcre-pattern]
+    [(? string? raw-pattern)
+     (escape-pcre-pattern raw-pattern)]))
+
 (define (rule->token rule)
   "Assuming @var{rule} is a terminal, return a token struct from it."
   (match rule
     [(rule/terminal name pattern modifier)
      (token name
-            pattern 
+            (regexify pattern)
             (terminal-modifier->type modifier) 
             (equal? modifier 'ignore))]))
 
