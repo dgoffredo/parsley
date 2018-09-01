@@ -11,7 +11,7 @@ STRING  ::=  /"(?<STRING_VALUE>([^\\"]|\\.))"/
 
 # This is too restrictive, but I didn't want to bother with hexidecimal, octal,
 # or scientific notation.
-decimal DECIMAL  ::=  /0|[1-9][0-9]*(\.[0-9]+)?/
+decimal DECIMAL  ::=  /(0|[1-9][0-9]*)(\.[0-9]+)?/
 
 # This is too restrictive, but I didn't want to play with Unicode.
 SYMBOL  ::=  /[^0-9][a-zA-Z0-9_\-!@#$%^&*+=:\/?~]*/
