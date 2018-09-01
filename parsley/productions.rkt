@@ -708,8 +708,9 @@
      (match (get-choice-bindings pattern name->rule)
        ; The pattern represents a choice among its bindings if
        ; get-choice-bindings returns a list of bindings/types containing every
-       ; binding in this rule.
-       [(list bindings ...)
+       ; binding in this rule, and if there're two or more bindings (a single
+       ; element choice is silly).
+       [(list bindings ..2)
         (=> fail)
         (match bindings
           [(list (list names _) ...)
