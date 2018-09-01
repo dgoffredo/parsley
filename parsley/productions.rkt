@@ -25,9 +25,11 @@
               categorize-rules             ; class, enumeration, rule, or other
               inline-others                ; non-terminal, non-class -> inlined
               extract-terminals            ; literals like "(" and /[0-9]/
-              remove-unreachable           ; run "garbage collection" on rules 
               remove-pluses                ; simplify: expr+  -->  expr expr*
+              simplify-patterns            ; further optimizations
+              remove-unreachable           ; run "garbage collection" on rules 
               remove-questions             ; simplify: expr?  -->  (expr | ())
+              recalculate-bindings         ; binding paths likely changed above
               verify-binding-consistency)] ; binding has same type everywhere
          [types (rules->schema-types rules)]  
          [tokens (rules->tokens rules)])
@@ -96,6 +98,63 @@
   [`(Question ,pattern)
    `(Alternation ,(remove-question pattern) ())])
 
+(define (simplify-pattern pattern)
+  "Transform the specified rule pattern in the following ways:
+
+   - Flatten directly nested alternations, e.g. A | (B | C) -> A | B | C.
+   - Elide duplicate alternates, e.g. A | A -> A, A | B | A -> A | B.
+   - Flatten directly nested concatenations, e.g. A (B C) -> A B C.
+   - Combine directly nested stars, e.g. (A*)* -> A*.
+   - Combine directly nested questions, e.g. (A?)? -> A?.
+   - Elide questions of starred patterns, e.g. (A*)? -> A*.
+   - Truncate and questionify alternations that have a question or star within
+     them, e.g. A | B? | C | D -> (A | B)?
+                A | B* | C | D -> A | B*"
+  (match pattern
+    [(list 'Alternation before ... (list 'Alternation inner ...) after ...)
+     (debug "simplify Alternation:" pattern)
+     (simplify-pattern `(Alternation ,@before ,@inner ,@after))]
+
+    [(list 'Alternation  before ... same between ... same after ...)
+     (debug "simplify duplicated Alternation:" pattern)
+     (simplify-pattern `(Alternation ,@before ,same ,@between ,@after))]
+
+    [(list 'Concatentaion before ... (list 'Concatenation inner ...) after ...)
+     (debug "simplify Concatenation:" pattern)
+     (simplify-pattern `(Concatenation ,@before ,@inner ,@after))]
+
+    [`(Star (Star ,inner))
+     (debug "simplify Star:" pattern)
+     (simplify-pattern `(Star ,inner))]
+
+    [`(Question (Question ,inner))
+     (debug "simplify Question:" pattern)
+     (simplify-pattern `(Question ,inner))]
+
+    [`(Question (Star ,inner))
+     (debug "simplify Question:" pattern)
+     (simplify-pattern `(Star ,inner))]
+
+    [(list 'Alternation before ... (list 'Star starred) _ ...)
+     (debug "simplify Alternation containing star:" pattern)
+     (simplify-pattern `(Alternation ,@before (Star ,starred)))]
+
+    [(list 'Alternation before ... (list 'Question questioned) _ ...)
+     (debug "simplify Alternation contaning question:" pattern)
+     (simplify-pattern `(Question (Alternation ,@before questioned)))]
+
+    [(list operation args ...)
+     (debug "simplify Recur down list:" pattern)
+     (let ([simplified (cons operation (map simplify-pattern args))])
+       (debug "pattern:" pattern "simplified:" simplified)
+       (if (equal? pattern simplified)
+         simplified                       ; no more simplifying can be done
+         (simplify-pattern simplified)))] ; maybe we can simplify further
+
+    [otherwise
+     (debug "simplify otherwise:" pattern)
+     otherwise]))
+
 (define (remove-pluses rules)
   (for/list ([rule rules])
     (replace-pattern rule remove-plus)))
@@ -103,6 +162,17 @@
 (define (remove-questions rules)
   (for/list ([rule rules])
     (replace-pattern rule remove-question)))
+
+(define (simplify-patterns rules)
+  (for/list ([rule rules])
+    (replace-pattern rule simplify-pattern)))
+
+(define (recalculate-bindings rules)
+  (for/list ([rule rules])
+    (match rule
+      [(rule/class name pattern _)
+       (rule/class name pattern (binding-paths pattern))]
+      [otherwise otherwise])))
 
 (define (inline-others rules)
   ; Transform the list of @var{rules} such that it's as if there were never
