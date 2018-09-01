@@ -150,7 +150,7 @@ int Lexer::operator()(bsl::vector<Token>       *output,
           case 0:
             break;  // match successful
           case 1:
-            errorStream << "Depth limit exceeded.\n";
+            errorStream << "Regular expression depth limit exceeded.\n";
             // fall through
           default:
             errorStream << "Failed to match the text: "

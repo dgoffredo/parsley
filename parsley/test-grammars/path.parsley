@@ -19,6 +19,6 @@ IDENTIFIER  ::=  /[a-zA-Z_][0-9a-zA-Z_]*/
 
 INTEGER  ::=  /0|[1-9][0-9]*/
 
-STRING  ::=  /"([^\\]|\\.)*"/
+STRING  ::=  /"(?P<STRING_VALUE>([^\\]|\\.)*)"/
 
 SEPARATOR  ::=  /\s*,\s*/

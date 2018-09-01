@@ -4,9 +4,15 @@
          attribute-case
          maker-case
          enum-value-case
-         bde-enum-value-case)
+         bde-enum-value-case
+         all-capitals?)
 
 (require threading) ; ~>> and similar macros
+
+(define (all-capitals? string)
+  "Return whether no unicode character in the specified @var{string} is lower
+   case"
+  (not (regexp-match #px"\\p{Ll}" string)))
 
 (define split-name
   (let* ([clauses '("\\s+"                                       ; whitespace

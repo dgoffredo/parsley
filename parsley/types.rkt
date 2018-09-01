@@ -22,3 +22,9 @@
 (struct schema/sequence    schema/base (element-types) #:transparent)
 (struct schema/choice      schema/base (element-types) #:transparent)
 (struct schema/enumeration schema/base (values)        #:transparent)
+
+; This struct contains all of the information necessary to lex a token and then
+; handle it appropriately. "pattern" is a regular expression pattern. "type"
+; is of the form (basic symbol?), and "ignore?" is a boolean indicating whether
+; the parser should skip this kind of token.
+(struct token (name pcre-pattern type ignore?) #:transparent)

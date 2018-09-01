@@ -11,16 +11,12 @@
          srfi/1
          racket/generator)
 
+(define-for-syntax debugging? #f)
+
 ; This struct contains the results of this module's work. "types" is a list
 ; of instances of the schema/* structs, and "tokens" is a list of instances of
 ; the token struct.
 (struct productions (types tokens) #:transparent)
-
-; This struct contains all of the information necessary to lex a token and then
-; handle it appropriately. "pattern" is a regular expression pattern. "type"
-; is of the form (basic symbol?), and "ignore?" is a boolean indicating whether
-; the parser should skip this kind of token.
-(struct token (name pcre-pattern type ignore?) #:transparent)
 
 (define (get-productions grammar)
   (let* ([rules
@@ -65,8 +61,6 @@
     [(or #f 'ignore) (basic 'string)]
     ['enumeration    (error "logic error: modifier should come from terminal")]
     [other           (basic other)]))
-
-(define-for-syntax debugging? #f)
 
 (define-syntax (debug stx)
   (syntax-case stx ()
@@ -654,7 +648,7 @@
              (fail))])]
        ; The pattern is not a choice, so it'll be a sequence. Figure out what
        ; the types of its members are.
-       [#f
+       [_
         (let* ([with-type (lambda (binding) 
                             (list binding 
                                   (binding-type-relative-to 
@@ -674,6 +668,7 @@
          (class-category rule name->rule)]
         [(rule/enumeration name pattern values)
          (schema/enumeration name rule values)]))))
+        
 
 (define (dependency-list rules)
   "Return a list of edges (list A B), where A and B are rule names, and an edge
