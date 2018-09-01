@@ -651,7 +651,7 @@
         ; a binding is a set of one
         [(list 'Bound name bound-pattern)
          (debug "in Bound case with " name ": " bound-pattern)
-         (let ([type (bound-pattern-type bound-pattern name->rule)])
+         (let ([type (scalar (bound-pattern-type bound-pattern name->rule))])
            (choice-set (set (list name type))))]
     
         ; an alternation between only sets is their union
