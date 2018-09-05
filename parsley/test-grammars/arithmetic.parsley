@@ -1,0 +1,25 @@
+# e.g. 3*(2 + 4 / 2 + 6) - 1
+# ... which is 29
+Expression  ::=  sumOrDiff:SumOrDiff
+             |   prodOrQuot:ProdOrQuot
+             |   atom:Atom
+
+Atom  ::=  identifier:IDENTIFIER
+       |   number:NUMBER
+       |   "(" expression:Expression ")"
+
+SumOrDiff  ::=  left:SumOrDiffTerm (op:PlusOrMinus right:SumOrDiffTerm)+
+
+SumOrDiffTerm  ::=  prodOrQuot:ProdOrQuot
+                |   atom:Atom
+
+ProdOrQuot  ::=  left:Atom (op:TimesOrDividedBy right:Atom)+
+
+# This wouldn't really fly... how would the generator rename these for C++?
+enumeration PlusOrMinus  ::=  "+" | "-"
+
+enumeration TimesOrDividedBy  ::=  "*" | "/"
+
+decimal NUMBER  ::=  /(0|[1-9][0-9]*)(\.[0-9]+)?/
+
+IDENTIFIER  ::=  /[^0-9][a-zA-Z0-9_\-!@#$%^&*+=:\/?~]*/

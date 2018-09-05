@@ -1,0 +1,25 @@
+Csv  ::=  rows:Row*
+
+Row  ::=  values:Value (SEPARATOR values:Value)* /[ \t]*\n/
+
+# Since commas may appear within quoted strings, each value has to be lexed
+# into "segments". The parser generator has no way of automatically combining
+# them in the output, so instead a Value contains an array of them, e.g.
+#     foo, bar, this contains "a, few, interesting" segments, last
+# yields:
+#     (Row values:((Value segments:("foo"))
+#                  (Value segments:("bar"))
+#                  (Value segments:("this contains "
+#                                   "a, few, interesting"
+#                                   " segments"))
+#                  (Value segments:("last"))))
+#
+Value  ::=  segments:Segment*
+
+Segment  ::=  string:STRING | other:OTHER
+
+STRING  ::=  /"(?P<STRING_VALUE>([^\\"]|\\.)*)"/
+
+OTHER  ::=  /[^,]*/
+
+SEPARATOR  ::=  /[ \t]*,[ \t]*/

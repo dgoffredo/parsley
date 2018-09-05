@@ -1,0 +1,42 @@
+Grammar  ::=  rules:Rule (BLANK_LINE+ rules:Rule)* BLANK_LINE*
+
+Rule  ::=  ignore:"ignore"? name:IDENTIFIER ("::="|":") pattern:Pattern
+
+Pattern  ::=  alternation:Alternation      # one from multiple options
+          |   concatenation:Concatenation  # one or more subpatterns
+
+Alternation  ::=  patterns:PatternTerm ("|" patterns:PatternTerm)+
+
+Concatenation  ::=  patterns:PatternTerm+
+
+PatternTerm  ::=  bound:BoundPatternTerm
+              |   unbound:QuantifiedPatternTerm
+
+BoundPatternTerm  ::=  name:IDENTIFIER ":" term:QuantifiedPatternTerm
+
+QuantifiedPatternTerm  ::=  star:UnquantifiedPatternTerm "*"
+                        |   plus:UnquantifiedPatternTerm "+"
+                        |   question:UnquantifiedPatternTerm "?"
+                        |   term:UnquantifiedPatternTerm
+
+UnquantifiedPatternTerm  ::=  literal:STRING
+                          |   regex:REGEX
+                          |   rule:IDENTIFIER
+                          |   empty:EMPTY
+                          |   "(" pattern:Pattern ")"
+
+IDENTIFIER  ::=  /[a-zA-Z_][0-9a-zA-Z_]*/
+
+STRING  ::=  /"([^\\"]|\\.)*"/
+
+REGEX  ::=  /\/([^\\\/]|\\.)*\//
+
+EMPTY  ::=  /\(\)/
+
+ignore COMMENT  ::=  /\(\*([^*]|\*[^)])*\*\)/
+
+BLANK_LINE  ::=  /\s*\n\s*\n\s*/
+
+ignore WS_LEFT  ::=  /\s+(?=\S)/
+
+ignore WS_END  ::=  /\s+$/

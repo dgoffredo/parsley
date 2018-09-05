@@ -10,7 +10,7 @@ namespace {
 
 typedef bsl::vector<LexerToken>::const_iterator TokenIter;
 
-// TODO: all the read functions (that's where it's at)
+// TODO: Declare all the read functions
 
 int tokenize(bsl::vector<LexerToken>  *tokens,
              const bslstl::StringRef&  input,
@@ -33,8 +33,10 @@ int genericParse(OBJECT                   *output,
 
     TokenIter begin = tokens.begin();
 
-    return read(output, &begin, tokens.end(), errorStream);
+    return read(output, &begin, tokens.end(), &errorStream);
 }
+
+// TODO: Define all the read functions
 
 }  // close unnamed namespace
 

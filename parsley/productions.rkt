@@ -16,7 +16,7 @@
 ; This struct contains the results of this module's work. "types" is a list
 ; of instances of the schema/* structs, and "tokens" is a list of instances of
 ; the token struct.
-(struct productions (types tokens) #:transparent)
+(struct productions (types tokens) #:prefab)
 
 (define (get-productions grammar)
   (let* ([rules
@@ -617,12 +617,12 @@
               (rule/other name pattern)]))))]))
 
 ; These rule structs categorize the raw Rule nodes from the grammar parse tree.
-(struct rule/base        (name pattern)          #:transparent)
-(struct rule/terminal    rule/base    (modifer)  #:transparent)
-(struct rule/other       rule/base    ()         #:transparent)
-(struct rule/complex     rule/base    ()         #:transparent)
-(struct rule/class       rule/complex (bindings) #:transparent)
-(struct rule/enumeration rule/complex (values)   #:transparent)
+(struct rule/base        (name pattern)          #:prefab)
+(struct rule/terminal    rule/base    (modifer)  #:prefab)
+(struct rule/other       rule/base    ()         #:prefab)
+(struct rule/complex     rule/base    ()         #:prefab)
+(struct rule/class       rule/complex (bindings) #:prefab)
+(struct rule/enumeration rule/complex (values)   #:prefab)
 
 (define (follow-path path tree)
   "Return the final subtree within @var{tree} reached by visiting the i'th
@@ -643,7 +643,7 @@
    the specified @var{pattern} will produce exactly one (not none of them
    and not two or more of them), or return #f if @var{pattern} does not so
    describe a choice."
-  (struct choice-set (binding-types-set) #:transparent)
+  (struct choice-set (binding-types-set) #:prefab)
 
   (match
     (let recur ([pattern pattern])
