@@ -25,4 +25,9 @@
                  `(define *parsley-version* ,(+ version 1))]
                 [other other])
               out)
-            (newline out)))))))                     ; blank line between forms
+            (newline out))))))                      ; blank line between forms
+   ; now `git add` the modified file
+   (system* (find-executable-path "git") "add" version-file)
+   ; don't print the result of system* to stdout
+   (void))
+   
