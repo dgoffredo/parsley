@@ -2,9 +2,10 @@
 
 (provide generate-lexer lexer-header lexer-source)
 
-(require "names.rkt" ; e.g. "fooBar" -> "e_FOO_BAR"
-         "types.rkt" ; struct token
-         threading)  ; ~> and similar macros
+(require "names.rkt"        ; e.g. "fooBar" -> "e_FOO_BAR"
+         "types.rkt"        ; struct token
+         "codegen-util.rkt" ; string-join* etc.
+         threading)         ; ~> and similar macros
 
 (define (generate-lexer tokens
                         package-name
@@ -433,6 +434,3 @@ int @|class-name|::operator()(bsl::vector<@|token-class|>   *output,
 }  // close package namespace
 }  // close enterprise namespace
 }))
-
-(define (string-join* separator strings)
-  (string-join strings separator))

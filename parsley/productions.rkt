@@ -6,6 +6,7 @@
 (require "types.rkt"
          "key-view.rkt"
          "mark-and-sweep.rkt"
+         "counter.rkt"
          graph
          threading
          srfi/1
@@ -16,7 +17,7 @@
 ; This struct contains the results of this module's work. "types" is a list
 ; of instances of the schema/* structs, and "tokens" is a list of instances of
 ; the token struct.
-(struct productions (types tokens) #:prefab)
+(struct productions (types tokens) #:transparent)
 
 (define (get-productions grammar)
   (let* ([rules
@@ -353,14 +354,6 @@
     [(list 'regex _) #t]
     [_ #f]))
 
-(define (make-counter from)
-  "Return a procedure of zero arguments that returns the next integer when
-   invoked, initially returning the integer @var{from}."
-  (generator ()
-    (let recur ([value from])
-      (yield value)
-      (recur (+ 1 value)))))
-
 (define (unique-terminal-name names counter)
   "Return a symbol suitable for use as the name of a lexer token. Use the
    specified set of @var{names} to ensure that symbol is not already taken,
@@ -616,14 +609,6 @@
                     ". Only terminals and enumerations may have a modifier.")))
               (rule/other name pattern)]))))]))
 
-; These rule structs categorize the raw Rule nodes from the grammar parse tree.
-(struct rule/base        (name pattern)          #:prefab)
-(struct rule/terminal    rule/base    (modifer)  #:prefab)
-(struct rule/other       rule/base    ()         #:prefab)
-(struct rule/complex     rule/base    ()         #:prefab)
-(struct rule/class       rule/complex (bindings) #:prefab)
-(struct rule/enumeration rule/complex (values)   #:prefab)
-
 (define (follow-path path tree)
   "Return the final subtree within @var{tree} reached by visiting the i'th
    child of the current subtree, for each i in @var{path}. e.g.
@@ -643,7 +628,7 @@
    the specified @var{pattern} will produce exactly one (not none of them
    and not two or more of them), or return #f if @var{pattern} does not so
    describe a choice."
-  (struct choice-set (binding-types-set) #:prefab)
+  (struct choice-set (binding-types-set) #:transparent)
 
   (match
     (let recur ([pattern pattern])

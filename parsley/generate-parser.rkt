@@ -1,11 +1,13 @@
-#lang racket
+#lang at-exp racket
 
-(provide reader-functions)
+(provide reader-functions ; TODO debugging
+         parser-header)
 
 (require "productions.rkt"
          "types.rkt"
          "names.rkt"
          "counter.rkt"
+         "codegen-util.rkt"
          threading
          srfi/1
          racket/generator
@@ -71,6 +73,9 @@
        output-type
        #f)]))
 
+; TODO: The arithmetic grammar makes me realize that an optimization is
+;       available after this step: Find functions that are the same, and pick
+;       just one of them, renaming as necessary.
 (define (pattern->reader pattern 
                          output-type 
                          element->accessor-name
@@ -103,11 +108,12 @@
            [(token name _ _ _) (reader/token name)]))]
       [(? symbol? name)
        (debug "pattern->reader symbol case:" name)
-       (match (dict-ref name->production name)
-         ; classes get read by their "read" function overload
-         [(schema/base name _) (reader/term 'forward "read")]
-         ; tokens get read by a call to a read overload with a token kind
-         [(token name _ _ _) (reader/term #f (reader/token name))])]
+       (let ([output (if output-type 'forward #f)])
+         (match (dict-ref name->production name)
+           ; classes get read by their "read" function overload
+           [(schema/base name _) (reader/term output "read")]
+           ; tokens get read by a call to a read overload with a token kind
+           [(token name _ _ _) (reader/term output (reader/token name))]))]
       ; TODO: This case and the star/question case share a lot of code. Figure
       ;       out how to refactor the common stuff.
       [(list (? alternation/concatenation? which) patterns ...)
@@ -268,12 +274,64 @@
                       ; (value reader) function
                       read-value-name))))]))))])))
 
-
 (define (generate-parser . TODO)
   'TODO)
 
-(define (parser-header . TODO)
-  'TODO)
+(define (declare-parse-function output-class lexer-class ns)
+  (let ([margin (make-string 4 #\space)])
+    @~a{@""
+@|margin|static int parse(@output-class                 *output,
+@|margin|                 const @|ns|bslstl::StringRef&  input,
+@|margin|                 bsl::ostream&                  errorStream,
+@|margin|                 @lexer-class                  *lexer = 0);}))
+
+(define (parser-header classes 
+                       package-name
+                       enterprise-namespace 
+                       parser-class 
+                       lexer-class)
+  (let* ([ns (if (equal? enterprise-namespace "BloombergLP")
+               "" 
+               "BloombergLP::")]
+         [guard-macro (~>> (list "INCLUDED" package-name parser-class)
+                           (map string-upcase)
+                           (string-join* "_"))])
+    @~a{
+#ifndef @guard-macro
+#define @guard-macro
+
+#include <bsl_iosfwd.h>
+#include <bsl_string.h>
+
+namespace @enterprise-namespace {
+namespace @package-name {
+@(~>> ; forward declarations of generated classes and the lexer
+   (cons lexer-class classes)
+   (map ~a)
+   (sort _ string<?)
+   (map (lambda (name) (~a "class " name ";")))
+   (string-join* "\n"))
+
+struct @parser-class {
+    // This 'struct' provides a namespace of functions used to parse instances
+    // of generated types from text.
+@(~>> ; declare an overload of "parse" for each class
+   classes
+   (map (lambda (name) (declare-parse-function name lexer-class ns)))
+   (string-join* "\n"))
+        // Load into the specified 'output' a value parsed from the specified
+        // 'input'. If an error occurs, write diagnostics to the specified
+        // 'errorStream'. Use the optionally specified 'lexer' to read tokens.
+        // If 'lexer' is zero, then a temporary '@lexer-class' instance will be
+        // used instead. Return zero on success or a nonzero value if an error
+        // occurs.
+};
+
+}  // close package namespace
+}  // close enterprise namespace
+
+#endif
+}))
 
 (define (parser-source . TODO)
   'TODO)
