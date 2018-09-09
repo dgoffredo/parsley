@@ -7,6 +7,7 @@
          "key-view.rkt"
          "mark-and-sweep.rkt"
          "counter.rkt"
+         "codegen-util.rkt" ; TODO: not the best name, since no codegen here
          graph
          threading
          srfi/1
@@ -399,11 +400,6 @@
        [otherwise
         ; Non-terminal leaf. Must be the name of another rule. Move along.
         (values rules name->rule pattern->terminal)])))
-
-(define (key-by accessor entries)
-  " :: (entry -> key) (list entry ...) -> (hash (key . entry) ...)"
-  (for/hash ([entry entries])
-    (values (accessor entry) entry)))
 
 (define (replace-literals-with-terminals pattern pattern->terminal)
   "Return a modified copy of @var{pattern} that has had within it replaced

@@ -14,15 +14,15 @@
 
 (define get-token
   (let ([regex (pregexp-alternation
-           "['0-9a-zA-Z_\\-]+"        ; IDENTIFIER
-           "\"(([^\\\\\"]|\\\\.)*)\"" ; STRING
-           "/(([^\\\\/]|\\\\.)*)/"    ; REGEX
-           "\\(\\)"                   ; EMPTY
-           "(?m:#(.*)$)"              ; COMMENT
-           "\\s*\n\\s*\n\\s*"         ; BLANK_LINE
-           "\\s+(?=\\S)"              ; WS_LEFT
-           "\\s+$"                    ; WS_END
-           "::=|[:|*?+()\\.]")])      ; other
+           "['0-9a-zA-Z_<>!@$%^&\\-]+" ; IDENTIFIER
+           "\"(([^\\\\\"]|\\\\.)*)\""  ; STRING
+           "/(([^\\\\/]|\\\\.)*)/"     ; REGEX
+           "\\(\\)"                    ; EMPTY
+           "(?m:#(.*)$)"               ; COMMENT
+           "\\s*\n\\s*\n\\s*"          ; BLANK_LINE
+           "\\s+(?=\\S)"               ; WS_LEFT
+           "\\s+$"                     ; WS_END
+           "::=|[:|*?+()\\.]")])       ; other (those appearing literally)
     (lambda (in)
       "Read a token from the specified input port."
       (~>> in (regexp-try-match regex) matches->utf-8 matches->token))))

@@ -58,6 +58,8 @@
 #ifndef @guard-macro
 #define @guard-macro
 
+#include <bdlb_literalutil.h>
+
 #include <bdlpcre_regex.h>
 
 #include <bslma_usesbslmaallocator.h>
@@ -108,6 +110,13 @@ namespace @enterprise-namespace {
         // Create a '@token-class' object having the specified 'kind' and the
         // specified 'value'.
 };
+
+// FREE FUNCTIONS
+bsl::ostream& operator<<(bsl::ostream& stream, @|token-class|::Kind tokenKind);
+    // Insert into the specified 'stream' a description of the specified
+    // 'tokenKind'. Return a reference providing modifiable access to 'stream'.
+    // Note that the output format is meant for human-readable diagnostics
+    // only, and so is subject to change.
 
                         // @subpattern-record-border
                         // @subpattern-record-decl
@@ -224,25 +233,68 @@ namespace @enterprise-namespace {
 namespace @package-name {
 namespace {
 
-// TODO: This belongs in the parser, not in the lexer (keep it here for now for
-//       debugging the generator).
-bool ignore(@|token-class|::Kind tokenKind)
-    // Return whether the specified 'tokenkind' ought to be ignored by the 
-    // parser.
+struct Subpattern {
+    const char           *d_name;
+    const char           *d_valueName;
+    const char           *d_pattern;
+    @|token-class|::Kind  d_kind;
+};
+
+const Subpattern k_SUBPATTERNS[] = {
+    @(~>> tokens
+        ; e.g. {"LPAREN", "LPAREN_VALUE", "\\(", LexerToken::e_FOO},
+        (map (match-lambda [(token name pattern _ _)
+                (~a "{" (~s (~a name)) ", "
+                (~s (name->value-name name)) ", "
+                (~s pattern) ", "
+                token-class "::" (bde-enum-value-case name)
+                "}")]))
+        (string-join* ",\n    "))
+};
+
+const Subpattern *const k_END = @|ns|bdlb::ArrayUtil::end(k_SUBPATTERNS);
+
+void addSubpattern(bsl::string *output, const Subpattern& subpattern)
 {
-    switch (tokenKind) {
-@(let ([case-line (lambda (enum)
-                    (~a "      case " token-class "::" enum 
-                      ": return true;"))])
-   (~>> tokens 
-     (filter token-ignore?) 
-     (map token-name) 
-     (map bde-enum-value-case)
-     (map case-line)
-     (string-join* "\n")))
-      default:
-        return false;
-    }
+    BSLS_ASSERT(output);
+
+    *output += "(?P<";  // python-style named subpattern
+    *output += subpattern.d_name;
+    *output += '>';
+    *output += subpattern.d_pattern;
+    *output += ')';
+}
+
+const Subpattern& subpatternByKind(@|token-class|::Kind tokenKind)
+{
+    const int index = tokenKind;
+    BSLS_ASSERT(index >= 0);
+    BSLS_ASSERT(index < @|ns|bdlb::ArrayUtil::size(k_SUBPATTERNS));
+
+    const Subpattern& subpattern = k_SUBPATTERNS[index];
+    BSLS_ASSERT(subpattern.d_kind == tokenKind);
+    return subpattern;
+}
+
+bsl::string getPattern()
+    // Return a bdlpcre-compatible regular expression pattern that is an
+    // alternation among the patterns of the tokens within the grammar. Each
+    // token pattern is a named subpattern.
+{
+    bsl::string result("(?:");  // Don't capture the alternation itself
+    const Subpattern *it = k_SUBPATTERNS;
+    
+    BSLS_ASSERT(it != k_END);
+    addSubpattern(&result, *it);
+
+    for (++it; it != k_END; ++it)
+    {
+        result += '|';
+        addSubpattern(&result, *it);
+    }    
+
+    result += ')';
+    return result;
 }
 
 void prepare(@|ns|bdlpcre::RegEx *regex)
@@ -252,46 +304,26 @@ void prepare(@|ns|bdlpcre::RegEx *regex)
     bsl::string error;
     bsl::size_t errorOffset;
 
-    static const char k_PATTERN[] = @(~s (regex-pattern tokens));
-    static const int  k_FLAGS     = @|ns|bdlpcre::RegEx::k_FLAG_UTF8;
+    const bsl::string pattern = getPattern();
+    const int flags           = @|ns|bdlpcre::RegEx::k_FLAG_UTF8;
 
-    const int rc = regex->prepare(&error, &errorOffset, k_PATTERN, k_FLAGS);
+    const int rc = 
+        regex->prepare(&error, &errorOffset, pattern.c_str(), flags);
 
     if (rc) {
-        bsl::cerr << "bdlpcre::RegEx::prepare returned error code " << rc
-                  << " with the message: " << error
-                  << "\nError occurred at offset " << errorOffset
-                  << " of the pattern: " << k_PATTERN << bsl::endl;
+        bsl::cerr << "Fatal programming error: bdlpcre::RegEx::prepare "
+                     "returned error code " << rc << " with the message: "
+                  << error << "\nError occurred at offset " << errorOffset
+                  << " of the pattern: " << pattern << bsl::endl;
     }
 
-    BSLS_ASSERT(rc == 0);
+    BSLS_ASSERT_OPT(rc == 0);
 }
 
 void enumerateSubpatterns(bsl::vector<@|subpattern-record-class|> *subpatterns,
                           const @|ns|bdlpcre::RegEx&               regex)
 { 
     BSLS_ASSERT(subpatterns);
-
-    struct Subpattern {
-        const char           *d_name;
-        const char           *d_valueName;
-        @|token-class|::Kind  d_kind;
-    };
-
-    static const Subpattern k_SUBPATTERNS[] = {
-        @(~>> tokens
-           ; e.g. {"LPAREN", "LPAREN_VALUE", LexerToken::e_FOO},
-           (map (match-lambda [(token name _ _ _)
-                  (~a "{" (~s (~a name)) ", "
-                    (~s (name->value-name name)) ", " 
-                    token-class "::" (bde-enum-value-case name)
-                    "}")]))
-            (string-join* ",\n        "))
-    };
-
-    static const Subpattern *const k_END = 
-        @|ns|bdlb::ArrayUtil::end(k_SUBPATTERNS);
-
     BSLS_ASSERT(regex.isPrepared());
 
     for (const Subpattern *iter = k_SUBPATTERNS; iter != k_END; ++iter)
@@ -334,6 +366,13 @@ class IsMatch {
     }
 };
 
+bsl::string quoted(const bslstl::StringRef& input)
+{
+    bsl::string result;
+    @|ns|bdlb::LiteralUtil::createQuotedEscapedCString(&result, input);
+    return result;
+}
+
 }  // close unnamed namespace
 
                             // @token-border
@@ -346,6 +385,16 @@ class IsMatch {
 : d_kind(kind)
 , d_value(value)
 {
+}
+
+// FREE FUNCTIONS
+bsl::ostream& operator<<(bsl::ostream& stream, @|token-class|::Kind tokenKind)
+{
+    const Subpattern& subpattern = subpatternByKind(tokenKind);
+
+    // e.g. <DIGITS /[1-9][0-9]+/>
+    return stream << '<' << subpattern.d_name << " /" << subpattern.d_pattern
+                  << "/>";
 }
 
                         // @subpattern-record-border
@@ -397,8 +446,8 @@ int @|class-name|::operator()(bsl::vector<@|token-class|>   *output,
             // fall through
           default:
             errorStream << "Failed to match the text: "
-                        << @|ns|bslstl::StringRef(input.begin() + offset,
-                                                  input.end())
+                        << quoted(@|ns|bslstl::StringRef(
+                                      input.begin() + offset, input.end()))
                         << "\nagainst the pattern: " << d_regex.pattern()
                         << "\nerror code: " << rc;
             return rc;  // match failure
