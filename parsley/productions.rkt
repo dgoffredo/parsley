@@ -483,10 +483,10 @@
   (match modifiers
     ['() #f]
     [(list modifier)
-     (let ([supported '(ignore enumeration byte decimal int integer long
+     (let ([supported '(ignore enumeration decimal int integer long
                         negativeInteger nonNegativeInteger
                         nonPositiveInteger positiveInteger short
-                        unsignedLong unsignedInt unsignedShort unsignedByte)])
+                        unsignedLong unsignedInt unsignedShort)])
        (if (member modifier supported)
          modifier
          (raise-user-error

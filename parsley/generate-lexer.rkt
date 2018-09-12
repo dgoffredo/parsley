@@ -39,9 +39,7 @@
                       class-name)
   "Return a string containing C++ source code for a header file definining a
    lexer."
-  (let* ([ns (if (equal? enterprise-namespace "BloombergLP")
-               "" 
-               "BloombergLP::")]
+  (let* ([ns (calculate-bloomberg-prefix enterprise-namespace)]
          [guard-macro (~>> (list "INCLUDED" package-name class-name)
                            (map string-upcase)
                            (string-join* "_"))]
@@ -449,7 +447,7 @@ int @|class-name|::operator()(bsl::vector<@|token-class|>   *output,
                         << quoted(@|ns|bslstl::StringRef(
                                       input.begin() + offset, input.end()))
                         << "\nagainst the pattern: " << d_regex.pattern()
-                        << "\nerror code: " << rc;
+                        << "\nerror code: " << rc << '\n';
             return rc;  // match failure
         }
 
