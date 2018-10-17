@@ -17,7 +17,7 @@ Selection  ::=  array:IDENTIFIER "[" index:INTEGER "]"
 
 IDENTIFIER  ::=  /[a-zA-Z_][0-9a-zA-Z_]*/
 
-INTEGER  ::=  /0|[1-9][0-9]*/
+integer INTEGER  ::=  /0|[1-9][0-9]*/
 
 STRING  ::=  /"(?P<STRING_VALUE>([^\\]|\\.)*)"/
 

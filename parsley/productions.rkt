@@ -8,12 +8,11 @@
          "mark-and-sweep.rkt"
          "counter.rkt"
          "codegen-util.rkt" ; TODO: not the best name, since no codegen here
+         "debug.rkt"
          graph
          threading
          srfi/1
          racket/generator)
-
-(define-for-syntax debugging? #f)
 
 ; This struct contains the results of this module's work. "types" is a list
 ; of instances of the schema/* structs, and "tokens" is a list of instances of
@@ -65,18 +64,6 @@
     [(or #f 'ignore) (basic 'string)]
     ['enumeration    (error "logic error: modifier should come from terminal")]
     [other           (basic other)]))
-
-(define-syntax (debug stx)
-  (syntax-case stx ()
-    [(debug args ...)
-     (if (not debugging?)
-       #'(void)
-       #'(begin
-           (displayln (~a args ...) (current-error-port))
-           (sleep 0.25)))]))
-
-(define-syntax-rule (debug* form)
-  (debug 'form ": " form))
 
 (define-syntax-rule (define-tree-transformer name clauses ...)
   (define (name tree)

@@ -1,0 +1,14 @@
+#!/bin/bash
+
+incdirs=$(ls -d ~/dev/bde/{thirdparty/,groups/*/b*})
+
+libdirs=$(ls -d ~/dev/bde/build/{thirdparty/*/,groups/*/})
+
+for dir in $incdirs; do
+    printf " -I$dir "
+done
+
+for dir in $libdirs; do
+    printf " -L$dir"
+done
+

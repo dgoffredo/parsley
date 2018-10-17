@@ -5,6 +5,9 @@
 #include <bdlb_literalutil.h>
 #include <bdlb_numericparseutil.h>  // only if there are typed tokens
 
+#include <bdlf_bind.h>
+#include <bdlf_placeholder.h>
+
 #include <bsls_nameof.h>
 
 #include <bsl_vector.h>
@@ -290,6 +293,14 @@ int read(bsl::string      *output,
 
     TokenIter& tokenIter = *tokenIterPtr;
 
+    if (tokenIter == endTokens) {
+        if (errors) {
+            *errors << "Reached the end of tokens. Unable to read token of "
+                       "kind " << tokenKind << '\n';
+        }
+        return 1;                                                      // RETURN
+    }
+
     if (tokenIter->d_kind != tokenKind)
     {
         if (errors) {
@@ -298,7 +309,7 @@ int read(bsl::string      *output,
                     << tokenIter->d_kind << " with the value "
                     << quoted(tokenIter->d_value) << '\n';
         }
-        return 1;                                                     // RETURN
+        return 2;                                                      // RETURN
     }
 
     if (output) {
@@ -309,65 +320,89 @@ int read(bsl::string      *output,
     return 0;
 }
 
-#define DEFINE_NUMERIC_READER(TYPE, UTIL_FUNC)                                \
-int read(TYPE             *output,                                            \
-         LexerToken::Kind  tokenKind,                                         \
-         TokenIter        *tokenIterPtr,                                      \
-         TokenIter         endTokens,                                         \
-         bsl::ostream     *errors)                                            \
-{                                                                             \
-    BSLS_ASSERT(tokenIterPtr);                                                \
-                                                                              \
-    const char *const name = bsls::NameOf<TYPE>::name();                      \
-    TokenIter         tokenIter(*tokenIterPtr);                               \
-    bsl::string       value;                                                  \
-    if (const int rc =                                                        \
-            read(&value, tokenKind, &tokenIter, endTokens, errors)) {         \
-        if (errors) {                                                         \
-            *errors << "Unable to read a " << name << " from a token of the " \
-                       " kind " << tokenKind << " because reading the token " \
-                       "itself failed.\n";                                    \
-        }                                                                     \
-        return rc;                                                            \
-    }                                                                         \
-                                                                              \
-    BSLS_ASSERT(*tokenIterPtr != endTokens);                                  \
-                                                                              \
-    const Token&      token = **tokenIterPtr;                                 \
-    TYPE              parsedValue;                                            \
-    bslstl::StringRef remainderOrErrorLocation;                               \
-    if (const int rc = bdlb::NumericParseUtil::UTIL_FUNC(                     \
-                           &parsedValue,                                      \
-                           &remainderOrErrorLocation,                         \
-                           token.d_value))                                    \
-    {                                                                         \
-        if (errors) {                                                         \
-            *errors << "Unable to convert " << quoted(token.d_value)          \
-                    << " to a " << name << ". Error occurred beginning at "   \
-                    << quoted(remainderOrErrorLocation) << '\n';              \
-        }                                                                     \
-        return rc;                                                            \
-    }                                                                         \
-                                                                              \
-    if (!remainderOrErrorLocation.empty()) {                                  \
-        if (errors) {                                                         \
-            *errors << "Parsed a " << name << ' ' << parsedValue << " from "  \
-                    << quoted(token.d_value)                                  \
-                    << " without consuming the entire string. "               \
-                    << quoted(remainderOrErrorLocation) << " remains.\n";     \
-        }                                                                     \
-        return 1;                                                             \
-    }                                                                         \
-                                                                              \
-    if (output) {                                                             \
-        *output = parsedValue;                                                \
-    }                                                                         \
-                                                                              \
-    *tokenIterPtr = tokenIter;                                                \
-    return 0;                                                                 \
+template <typename Number, typename NumberParser>
+int readNumeric(Number           *output,
+                LexerToken::Kind  tokenKind,
+                TokenIter        *tokenIterPtr,
+                TokenIter         endTokens,
+                bsl::ostream     *errors
+                NumberParser      parseNumber)
+{
+    BSLS_ASSERT(tokenIterPtr);
+
+    TokenIter         tokenIter(*tokenIterPtr);
+    bsl::string       value;
+    if (const int rc =
+            read(&value, tokenKind, &tokenIter, endTokens, errors)) {
+        if (errors) {
+            const char *const name = bsls::NameOf<Number>::name();
+            *errors << "Unable to read a " << name << " from a token of the "
+                       " kind " << tokenKind << " because reading the token "
+                       "itself failed.\n";
+        }
+        return rc;
+    }
+
+    // If we had started at the end, reading above would have failed.
+    BSLS_ASSERT(*tokenIterPtr != endTokens);
+
+    const Token&      token = **tokenIterPtr;
+    Number            parsedValue;
+    bslstl::StringRef remainderOrErrorLocation;
+    if (const int rc = parseNumber(&parsedValue,
+                                   &remainderOrErrorLocation,
+                                   token.d_value))
+    {
+        if (errors) {
+            const char *const name = bsls::NameOf<Number>::name();
+            *errors << "Unable to convert " << quoted(token.d_value)
+                    << " to a " << name << ". Error occurred beginning at "
+                    << quoted(remainderOrErrorLocation) << '\n';
+        }
+        return rc;
+    }
+
+    if (!remainderOrErrorLocation.empty()) {
+        if (errors) {
+            const char *const name = bsls::NameOf<Number>::name();
+            *errors << "Parsed a " << name << ' ' << parsedValue << " from "
+                    << quoted(token.d_value)
+                    << " without consuming the entire string. "
+                    << quoted(remainderOrErrorLocation) << " remains.\n";
+        }
+        return 1;
+    }
+
+    if (output) {
+        *output = parsedValue;
+    }
+
+    *tokenIterPtr = tokenIter;
+    return 0;
 }
 
-DEFINE_NUMERIC_READER(int, parseInt)
+#define DEFINE_NUMERIC_READ(TYPE, FUNC)                                       \
+    int FUNC(TYPE                     *result,                                \
+             bslstl::StringRef        *remainder,                             \
+             const bslstl::StringRef&  input)                                 \
+    {                                                                         \
+        /* This wrapper function exists to avoid overload ambiguity. */       \
+        return bdlb::NumericParserUtil::FUNC(result, remainder, input);       \
+    }                                                                         \
+                                                                              \
+    int read(TYPE             *output,                                        \
+             LexerToken::Kind  tokenKind,                                     \
+             TokenIter        *tokenIterPtr,                                  \
+             TokenIter         endTokens,                                     \
+             bsl::ostream     *errors)                                        \
+    {                                                                         \
+        using namespace bdlf::PlaceHolders;                                   \
+                                                                              \
+        return readNumeric(                                                   \
+                   output, tokenKind, tokenIterPtr, endTokens, errors, &FUNC);\
+    }
+
+DEFINE_NUMERIC_READ(int, parseInt)
 
 }  // close unnamed namespace
 
