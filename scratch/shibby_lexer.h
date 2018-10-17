@@ -1,5 +1,7 @@
-#ifndef INCLUDED_PACKAGE_LEXER
-#define INCLUDED_PACKAGE_LEXER
+#ifndef INCLUDED_SHIBBY_LEXER
+#define INCLUDED_SHIBBY_LEXER
+
+#include <bdlb_literalutil.h>
 
 #include <bdlpcre_regex.h>
 
@@ -13,13 +15,13 @@
 #include <bsl_utility.h>
 #include <bsl_vector.h>
 
-namespace Enterprise {
+namespace BloombergLP {
 namespace bslma { class Allocator; }
-namespace package {
+namespace shibby {
 
-                            // ================
-                            // class LexerToken
-                            // ================
+                            // =================
+                            // struct LexerToken
+                            // =================
 
 struct LexerToken {
     // This 'struct' represents a lexer token parsed from some input. Each
@@ -28,10 +30,10 @@ struct LexerToken {
     // corresponding to the token.
 
     // TYPES
-    enum Kind { e_STRING, e_FOO, e_BAR };
+    enum Kind { e_TOKEN_8, e_TOKEN_7, e_TOKEN_6, e_TOKEN_5, e_TOKEN_4, e_TOKEN_3, e_TOKEN_2, e_TOKEN_1, e_IDENTIFIER, e_INTEGER, e_STRING, e_SEPARATOR };
 
     // PUBLIC DATA
-    Kind              d_kind;
+    Kind                   d_kind;
     bslstl::StringRef d_value;
 
     // CREATORS
@@ -40,17 +42,24 @@ struct LexerToken {
         // specified 'value'.
 };
 
-                        // ============================
-                        // class Lexer_SubpatternRecord
-                        // ============================
+// FREE FUNCTIONS
+bsl::ostream& operator<<(bsl::ostream& stream, LexerToken::Kind tokenKind);
+    // Insert into the specified 'stream' a description of the specified
+    // 'tokenKind'. Return a reference providing modifiable access to 'stream'.
+    // Note that the output format is meant for human-readable diagnostics
+    // only, and so is subject to change.
+
+                        // =============================
+                        // struct Lexer_SubpatternRecord
+                        // =============================
 
 struct Lexer_SubpatternRecord {
     // This component-private 'class' represents a particular token "kind" and
-    // the corresponding index into a 'Lexer' subpattern matches vector where
-    // the match of that token, if any, can be found.
+    // the corresponding index into a 'Lexer' subpattern matches vector
+    // where the match of that token, if any, can be found.
 
     // PUBLIC DATA
-    bsl::size_t      d_valueIndex;
+    bsl::size_t          d_index;
     LexerToken::Kind d_kind;
 
     // CREATORS
@@ -68,12 +77,12 @@ class Lexer {
     // input string into a sequence of tokens. Although the function is
     // stateless, separate invocations of the same object share data structures
     // in order to reduce the overhead of regular expression compilation and
-    // memory allocation between invocations.
+    // memory allocation.
 
     // DATA
-    bdlpcre::RegEx                                    d_regex;
+    bdlpcre::RegEx                               d_regex;
     bsl::vector<bsl::pair<bsl::size_t, bsl::size_t> > d_matches;
-    bsl::vector<Lexer_SubpatternRecord>               d_subpatterns;  // const
+    bsl::vector<Lexer_SubpatternRecord>           d_subpatterns;  // const
 
   public:
     // TRAITS
@@ -86,9 +95,9 @@ class Lexer {
         // currently installed default allocator will be used instead.
 
     // MANIPULATORS
-    int operator()(bsl::vector<LexerToken>  *output,
+    int operator()(bsl::vector<LexerToken>   *output,
                    const bslstl::StringRef&  input,
-                   bsl::ostream&             errorStream);
+                   bsl::ostream&                  errorStream);
         // Load into the specified 'output' tokens read from the specified
         // 'input'. If an error occurs, print a diagnostic to the specified
         // 'errorStream'. Return zero on success or a nonzero value if an error

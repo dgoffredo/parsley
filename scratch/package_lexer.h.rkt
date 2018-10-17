@@ -1,7 +1,18 @@
+#lang at-exp racket
+
+(provide lexer-header)
+
+; This is the wrong version of the header to templatify, but I was just playing
+; with the reader anyway.
+
+(require threading)
+
+(define (lexer-header std enterprise-namespace names)
+  @~a{
 #ifndef INCLUDED_LAZY_LEXER
 #define INCLUDED_LAZY_LEXER
 
-namespace Enterprise {
+namespace @enterprise-namespace {
 namespace lazy {
 
                             // ================
@@ -15,11 +26,14 @@ struct LexerToken {
     // corresponding to the token.
 
     // TYPES
-    enum Kind { e_STRING, e_FOO, e_BAR };
+    enum Kind { @(~>> names
+                   (map ~a)
+                   (map (lambda (name) (~a "e_" (string-upcase name))))
+                   (string-join _ ", ")) };
 
     // PUBLIC DATA
     Kind        d_kind;
-    bsl::string d_value;
+    @|std|string d_value;
 };
 
                         // ============================
@@ -32,11 +46,11 @@ struct Lexer_SubpatternRecord {
     // the match of that token, if any, can be found.
 
     // PUBLIC DATA
-    bsl::size_t      d_valueIndex;
+    @|std|size_t      d_valueIndex;
     LexerToken::Kind d_kind;
 
     // CREATORS
-    Lexer_SubpatternRecord(bsl::size_t valueIndex, LexerToken::Kind kind);
+    Lexer_SubpatternRecord(@|std|size_t valueIndex, LexerToken::Kind kind);
         // Create a 'Lexer_SubpatternRecord' object having the specified
         // 'valueIndex' and the specified 'kind'.
 };
@@ -49,17 +63,17 @@ class Lexer {
     // TODO
 
     // DATA
-    bsl::streambuf                                    *d_streambuf_p;
+    @|std|streambuf                                    *d_streambuf_p;
     bdlpcre::RegEx                                     d_regex;
-    bsl::vector<bsl::pair<bsl::size_t, bsl::size_t> >  d_matches;
-    bsl::vector<Lexer_SubpatternRecord>                d_subpatterns;  // const
+    @|std|vector<bsl::pair<bsl::size_t, bsl::size_t> >  d_matches;
+    @|std|vector<Lexer_SubpatternRecord>                d_subpatterns;  // const
 
   public:
     // TRAITS
     BSLMF_NESTED_TRAIT_DECLARATION(Lexer, bslma::UsesBslmaAllocator)
 
     // CREATORS
-    explicit Lexer(bsl::streambuf   *streambuf,
+    explicit Lexer(@|std|streambuf   *streambuf,
                    bslma::Allocator *basicAllocator = 0);
         // Create a new 'Lexer' object that reads token from the specified
         // 'streambuf'. Use the optionally specified 'basicAllocator' to supply
@@ -67,7 +81,7 @@ class Lexer {
         // allocator will be used instead.
 
     // MANIPULATORS
-    int next(LexerToken *token, bsl::ostream *errorStream = 0);
+    int next(LexerToken *token, @|std|ostream *errorStream = 0);
         // Load into the specified 'token' the next token read from the
         // streambuf held by this object. Return zero on success or a nonzero
         // value if a token could not be read. Return '-1' if the streambuf
@@ -75,10 +89,11 @@ class Lexer {
         // occurs and the optionally specified 'errorStream' is nonzero, write
         // a diagnostic to 'errorStream'.
 
-    void reset(bsl::streambuf *streambuf);
+    void reset(@|std|streambuf *streambuf);
         // Use the specified 'streambuf' to supply characters in subsequent
         // calls to 'next'.
 };
 
 }  // close enterprise namespace
 }  // close package namespace
+})

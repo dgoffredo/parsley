@@ -6,285 +6,33 @@
 (require "productions.rkt"
          "types.rkt"
          "names.rkt"
-         "counter.rkt"
          "codegen-util.rkt"
          "applicable-dict.rkt"
-         threading
-         srfi/1
-         racket/generator
-         racket/hash)
-
-(define-for-syntax debugging? #t)
-
-(define-syntax (debug stx)
-  (syntax-case stx ()
-    [(debug args ...)
-     (if debugging?
-       #'(displayln (string-join (map ~a (list args ...)))
-                    (current-error-port))
-       #'(void))]))
-
-; This struct describes a C++ function that will appear in the anonymous
-; namespace of the parser's implementation. Each reader-function reads either
-; a class or some part of a class.
-(struct reader-function (name output-type reader) #:prefab)
-
-; These structs describe parts of a reader-function. Each node in a production
-; rule pattern corresponds to a strategy for reading that production from
-; input, e.g. (Concatenation A B?) produces a concatenation-reader whose
-; readers are a term-reader and a question-reader, respectively.
-(struct reader/base          (pattern)             #:prefab)
-(struct reader/compound      reader/base (readers) #:prefab)
-(struct reader/concatenation reader/compound ()    #:prefab)
-(struct reader/alternation   reader/compound ()    #:prefab)
-(struct reader/star          reader/base (term)    #:prefab)
-(struct reader/question      reader/base (term)    #:prefab)
-; The term-output field of reader/term can be any of:
-; - 'forward, indicating that the output parameter of the calling function
-;   is forwarded to it, or
-; - a member-accessor object, indicating that the output goes to a member of
-;   the output parameter of the calling function, or
-; - #f, indicating no output (pass a null pointer for the output parameter).
-; The function field of reader/term can be any of:
-; - a string naming the function, or
-; - a reader/token object indicating the token to be read.
-(struct reader/term        reader/base (term-output function) #:prefab)
-(struct reader/token       reader/base (name)                 #:prefab)
-(struct reader/enumeration reader/base (class-name function)  #:prefab)
-(struct member-accessor    (name)                 #:prefab)
-
-(define (alternation/concatenation? symbol)
-  (member symbol '(Alternation Concatenation)))
-
-(define (star/question? symbol)
-  (member symbol '(Star Question)))
-
-(define (contains-bindings? pattern)
-  (match pattern
-    [(list 'Bound _ _) #t]
-    [(list _ args ...) (any contains-bindings? args)]
-    [_ #f]))
-
-(define (pattern->output-type pattern output-type)
-  (debug "in" (~s (list 'pattern->output-type pattern output-type)))
-  (match output-type
-    [(occurrence (basic _)) output-type] ; basic -> keep (e.g. for enum values)
-    [#f #f]                              ; none -> none
-    [_                                   ; otherwise, only if has bindings
-     (if (contains-bindings? pattern)
-       output-type
-       #f)]))
-
-; TODO: The arithmetic grammar makes me realize that an optimization is
-;       available after this step: Find functions that are the same, and pick
-;       just one of them, renaming as necessary.
-(define (pattern->reader pattern 
-                         output-type 
-                         element->accessor-name
-                         name->production
-                         get-reader-function-name)
-  (let recur ([pattern (restore-question pattern)]
-              [output-type output-type] 
-              [element->accessor-name element->accessor-name]
-              [name->production name->production]
-              [get-reader-function-name get-reader-function-name])
-    (match pattern ; TODO: 
-                   ; Probably want the restore-question step to be more
-                   ; visible from the outside, but then need a replace-rule
-                   ; procedure for schema/* types analogous to replace-pattern
-                   ; for rule/* types.
-      ; TODO: This case and the symbol case share some code. Figure out how to
-      ;       refactor the common stuff.
-      [(list 'Bound element-name binding-pattern)
-       (debug "pattern->reader Bound case:" element-name binding-pattern)
-       (reader/term
-         ; pattern
-         pattern
-         ; term-output
-         (if output-type
-           (member-accessor (dict-ref element->accessor-name element-name))
-           #f)
-         ; function
-         (match (dict-ref name->production binding-pattern)
-           ; classes get read by their "read" function overload
-           [(schema/base name _) "read"]
-           ; tokens get read by a call to a read overload with a token kind
-           [(token name pattern _ _) (reader/token pattern name)]))]
-      [(? symbol? name)
-       (debug "pattern->reader symbol case:" name)
-       (let ([output (if output-type 'forward #f)])
-         (match (dict-ref name->production name)
-           ; classes get read by their "read" function overload
-           [(schema/base name _) (reader/term name output "read")]
-           ; tokens get read by a call to a read overload with a token kind
-           [(token name pattern _ _)
-            (reader/term pattern output (reader/token pattern name))]))]
-      ; TODO: This case and the star/question case share a lot of code. Figure
-      ;       out how to refactor the common stuff.
-      [(list (? alternation/concatenation? which) patterns ...)
-       (debug "pattern->reader alt/cat case:" which patterns)
-       (let ([reader-constructor
-              (match which
-                ['Concatenation reader/concatenation]
-                ['Alternation reader/alternation])])
-         (reader-constructor
-           pattern
-           (for/list ([pattern patterns])
-             (let* ([output-type (pattern->output-type pattern output-type)]
-                    [reader
-                     (recur pattern
-                            output-type
-                            element->accessor-name
-                            name->production
-                            get-reader-function-name)])
-                (debug "in pattern->reader alt/cat with output-type:"
-                       output-type)
-                (match reader
-                  [(struct reader/compound _)
-                   (let ([name (get-reader-function-name output-type reader)])
-                     (debug "in pattern->reader alt/cat about to emit term "
-                            "for output-type:" output-type 
-                            " and reader/compound function name:" name)
-                     (reader/term pattern (if output-type 'forward #f) name))]
-                  [_ 
-                   (debug "in pattern->reader alt/cat about to emit term for "
-                          "output-type:" output-type 
-                          " and reader:" reader)
-                   reader])))))]
-      [(list (? star/question? which) term-pattern)
-       (debug "pattern->reader star/question case:" which term-pattern)
-       (let* ([output-type (pattern->output-type term-pattern output-type)]
-              [reader
-               (recur term-pattern
-                      output-type
-                      element->accessor-name
-                      name->production
-                      get-reader-function-name)]
-              [reader-constructor
-               (match which 
-                 ['Star reader/star]
-                 ['Question reader/question])])
-           (reader-constructor
-             pattern
-             (match reader
-               [(struct reader/compound _)
-                (let ([name (get-reader-function-name output-type reader)])
-                  (reader/term term-pattern 
-                               (if output-type 'forward #f)
-                               name))]
-               [_ reader])))])))
-
-(define (productions-by-name types-and-tokens)
-  (match types-and-tokens
-    [(productions types tokens)
-     (hash-union
-       (for/hash ([type types])
-         (values (schema/base-name type) type))
-       (for/hash ([token tokens])
-         (values (token-name token) token)))]))
-
-(define (sequence/choice-reader-function class-name
-                                         pattern
-                                         element-types
-                                         name->production
-                                         name-casing)
-  (let ([output-type  (scalar (complex class-name))])
-    (reader-function
-      ; name
-      "read"
-      ; output type
-      output-type
-      ; reader
-      (pattern->reader
-        ; pattern
-        pattern
-        ; output type
-        output-type
-        ; element->accessor-name
-        (for/hash ([elem-type element-types])
-          (match elem-type
-            [(list elem-name _)
-              (values elem-name (name-casing elem-name))]))
-        ; hash-table mapping productions by name
-        name->production
-        ; get-reader-function-name (to create child readers)
-        (let ([tick (make-counter 1)])
-          (lambda (output-type reader)
-            (debug "in" (~s (list 'get-reader-function-name output-type reader)))
-            (let ([name (~a "read" class-name "_" (tick))])
-              (yield (reader-function name output-type reader))
-              name)))))))
-
-(define (reader-functions types-and-tokens)
-  (let ([name->production (productions-by-name types-and-tokens)])
-    (match types-and-tokens
-      [(productions types tokens)
-       (sequence->list
-         (in-generator
-           (for ([type types])
-             (match type
-               [(schema/sequence name rule element-types)
-                (yield
-                  (sequence/choice-reader-function
-                    (class-case name)        ; class-name
-                    (rule/base-pattern rule) ; pattern
-                    element-types
-                    name->production
-                    attribute-case))] ; name-casing (different in choice)
-               [(schema/choice name rule element-types)
-                (yield
-                  (sequence/choice-reader-function
-                    (class-case name)        ; class-name
-                    (rule/base-pattern rule) ; pattern
-                    element-types
-                    name->production
-                    maker-case))] ; name-casing (different in sequence)
-               [(schema/enumeration name rule values)
-                ; An enumeration class "Foo" yields two functions:
-                ; first "readFooValue", which outputs to a string and is an
-                ; alternation reader among the tokens matching the values of
-                ; Foo, and second "read" overloaded for "Foo::Value", which
-                ; calls "readFooValue" and then converts the resulting string
-                ; into a "Foo::Value" using the conversion routine in "Foo".
-                (let ([read-value-name (~a "read" (class-case name) "Value")]
-                      [string-type (scalar (basic 'string))])
-                  ; the function that outputs the string value of the enum.
-                  (yield
-                    (reader-function
-                      ; name
-                      read-value-name
-                      ; output type
-                      string-type
-                      ; reader
-                      (pattern->reader
-                        ; pattern
-                        (rule/base-pattern rule)
-                        ; output type
-                        string-type
-                        ; element->accessor-name (not used in this case)
-                        #f
-                        ; hash-table mapping productions by name
-                        name->production
-                        ; get-reader-function-name (not used in this case)
-                        #f)))
-                  ; the function that outputs the enum value
-                  (yield
-                    (reader-function
-                    ; name
-                    "read"
-                    ; output type (the name of the enum type within the class)
-                    (scalar (complex (~a (class-case name) "::Value")))
-                    ; reader
-                    (reader/enumeration
-                      ; pattern
-                      (rule/base-pattern rule)
-                      ; class name
-                      (class-case name)
-                      ; (value reader) function
-                      read-value-name))))]))))])))
+         "debug.rkt"
+         "parser-functions.rkt"
+         threading)
 
 (define (generate-parser . TODO)
   'TODO)
+
+(define (reader-function-declare function #:semicolon? [semicolon? #t])
+  (match function
+    [(reader-function name output-type _)
+     @~a{int @name(@(if output-type ; output parameter if output-type is not #f
+                        (~a output-type " *output,") 
+                        "")
+         TokenIter    *token,
+         TokenIter     endTokens,
+         bsl::ostream *errors)@(if semicolon? ";" "")}]))
+
+(define (reader-function-define function)
+  (match function
+    [(reader-function name output-type reader)
+     @~a{@(reader-function-declare function #:semicolon? #f)
+{
+    // TODO: code here
+}
+}]))
 
 (define (declare-parse-function output-class lexer-class ns)
   (let ([margin (make-string 4 #\space)])
@@ -314,22 +62,6 @@
     }
 }})
 
-; TODO: This will be able to appear inline in the .cpp template.
-(define (token-read-declaration token-class)
-  @~a{int read(bsl::string      *output,
-         @|token-class|::Kind  tokenKind,
-         TokenIter        *token,
-         TokenIter         endTokens,
-         bsl::ostream     *errors);
-    // If the specified 'token' refers to a token having the specified
-    // 'tokenKind', then increment 'token', and if additionally 'output' is not
-    // zero, load the value of the matching token into 'output'. Return zero on
-    // success or a nonzero value if 'token' does not refer to a token of kind
-    // 'tokenKind' or is equal to the specified 'endTokens'. On failure, if the
-    // specified 'errors' is not zero, write a diagnostic to 'errors'
-    // describing how reading failed.
-})
-
 (define (numeric-read-declaration cpp-type token-class)
   @~a{int read(@cpp-type              *output,
          @|token-class|::Kind  tokenKind,
@@ -358,69 +90,98 @@
     "\n    "
     numeric-read-contract))
 
-(define (numeric-read-macro token-class ns)
+(define (numeric-read-template token-class ns)
   @~a{
-#define DEFINE_NUMERIC_READER(TYPE, UTIL_FUNC)                                \
-int read(TYPE                 *output,                                        \
-         @|token-class|::Kind  tokenKind,                                     \
-         TokenIter            *tokenIterPtr,                                  \
-         TokenIter             endTokens,                                     \
-         bsl::ostream         *errors)                                        \
-{                                                                             \
-    BSLS_ASSERT(tokenIterPtr);                                                \
-                                                                              \
-    const char *const name = bsls::NameOf<TYPE>::name();                      \
-    TokenIter         tokenIter(*tokenIterPtr);                               \
-    bsl::string       value;                                                  \
-    if (const int rc =                                                        \
-            read(&value, tokenKind, &tokenIter, endTokens, errors)) {         \
-        if (errors) {                                                         \
-            *errors << "Unable to read a " << name << " from a token of the " \
-                       " kind " << tokenKind << " because reading the token " \
-                       "itself failed.\n";                                    \
-        }                                                                     \
-        return rc;                                                            \
-    }                                                                         \
-                                                                              \
-    BSLS_ASSERT(*tokenIterPtr != endTokens);                                  \
-                                                                              \
-    const Token&           token = **tokenIterPtr;                            \
-    TYPE                   parsedValue;                                       \
-    @|ns|bslstl::StringRef remainderOrErrorLocation;                          \
-    if (const int rc = @|ns|bdlb::NumericParseUtil::UTIL_FUNC(                \
-                           &parsedValue,                                      \
-                           &remainderOrErrorLocation,                         \
-                           token.d_value))                                    \
-    {                                                                         \
-        if (errors) {                                                         \
-            *errors << "Unable to convert " << quoted(token.d_value)          \
-                    << " to a " << name << ". Error occurred beginning at "   \
-                    << quoted(remainderOrErrorLocation) << '\n';              \
-        }                                                                     \
-        return rc;                                                            \
-    }                                                                         \
-                                                                              \
-    if (!remainderOrErrorLocation.empty()) {                                  \
-        if (errors) {                                                         \
-            *errors << "Parsed a " << name << ' ' << parsedValue << " from "  \
-                    << quoted(token.d_value)                                  \
-                    << " without consuming the entire string. "               \
-                    << quoted(remainderOrErrorLocation) << " remains.\n";     \
-        }                                                                     \
-        return 1;                                                             \
-    }                                                                         \
-                                                                              \
-    if (output) {                                                             \
-        *output = parsedValue;                                                \
-    }                                                                         \
-                                                                              \
-    *tokenIterPtr = tokenIter;                                                \
-    return 0;                                                                 \
+template <typename Number, typename NumberParser>
+int readNumeric(Number               *output,
+                @|token-class|::Kind  tokenKind,
+                TokenIter            *tokenIterPtr,
+                TokenIter             endTokens,
+                bsl::ostream         *errors
+                NumberParser          parseNumber)
+{
+    BSLS_ASSERT(tokenIterPtr);
+
+    TokenIter         tokenIter(*tokenIterPtr);
+    bsl::string       value;
+    if (const int rc =
+            read(&value, tokenKind, &tokenIter, endTokens, errors)) {
+        if (errors) {
+            const char *const name = @|ns|bsls::NameOf<Number>::name();
+            *errors << "Unable to read a " << name << " from a token of the "
+                       " kind " << tokenKind << " because reading the token "
+                       "itself failed.\n";
+        }
+        return rc;                                                     // RETURN
+    }
+
+    // If we had reached the end, the 'read' call above would have failed.
+    BSLS_ASSERT(*tokenIterPtr != endTokens);
+
+    const @|token-class|&  token = **tokenIterPtr;
+    Number                 parsedValue;
+    @|ns|bslstl::StringRef remainderOrErrorLocation;
+    if (const int rc = parseNumber(&parsedValue,
+                                   &remainderOrErrorLocation,
+                                   token.d_value))
+    {
+        if (errors) {
+            const char *const name = @|ns|bsls::NameOf<Number>::name();
+            *errors << "Unable to convert " << quoted(token.d_value)
+                    << " to a " << name << ". Error occurred beginning at "
+                    << quoted(remainderOrErrorLocation) << '\n';
+        }
+        return rc;                                                     // RETURN
+    }
+
+    if (!remainderOrErrorLocation.empty()) {
+        if (errors) {
+            const char *const name = @|ns|bsls::NameOf<Number>::name();
+            *errors << "Parsed a " << name << ' ' << parsedValue << " from "
+                    << quoted(token.d_value)
+                    << " without consuming the entire string. "
+                    << quoted(remainderOrErrorLocation) << " remains.\n";
+        }
+        return 1;                                                      // RETURN
+    }
+
+    if (output) {
+        *output = parsedValue;
+    }
+
+    *tokenIterPtr = tokenIter;
+    return 0;
 }
+
+#define DEFINE_NUMERIC_READ(TYPE, FUNC)                                       \
+    int read(TYPE                 *output,                                    \
+             @|token-class|::Kind  tokenKind,                                 \
+             TokenIter            *tokenIterPtr,                              \
+             TokenIter             endTokens,                                 \
+             bsl::ostream         *errors)                                    \
+    {                                                                         \
+        using namespace @|ns|bdlf::PlaceHolders;                              \
+                                                                              \
+        return readNumeric(output,                                            \
+                           tokenKind,                                         \
+                           tokenIterPtr,                                      \
+                           endTokens,                                         \
+                           errors,                                            \
+                           @|ns|bdlf::BindUtil::bind(                         \
+                               &@|ns|bdlb::NumericParserUtil::FUNC,           \
+                               _1,    /* output value */                      \
+                               _2,    /* output remainder or error */         \
+                               _3));  /* input */                             \
+    }
+
+DEFINE_NUMERIC_READ(int, parseInt)
 })
 
+(define (numeric-read-macro token-class ns)
+  @~a{TODO})
+
 (define (numeric-read-definition cpp-type parser-func-name)
-    @~a{DEFINE_NUMERIC_READER(@cpp-type, @parser-func-name)
+    @~a{DEFINE_NUMERIC_READ(@cpp-type, @parser-func-name)
 })
 
 (define type->func-name
@@ -435,34 +196,12 @@ int read(TYPE                 *output,                                        \
 
 (define (numeric-read-definitions cpp-types token-class ns)
   (~a
-    (numeric-read-macro token-class ns)
+    (numeric-read-macro token-class ns) ; TODO
     "\n"
     (string-join* "\n"
       (for/list ([type cpp-types])
         (numeric-read-definition type (type->func-name type))))
     "\n#undef DEFINE_NUMERIC_READER\n"))
-
-(define (restore-question pattern)
-  "Replace occurrences of alternations involving nil instead with a question
-   mark operator, e.g. transform
-       foo | ()
-   into
-       foo?
-   Question mark operators are removed during previous analysis of the rules,
-   but they are useful to recognize for parser generation (the resulting code
-   makes more sense)."
-  (match pattern
-    [(list 'Alternation subpattern '())
-     (debug "restore-question Alternation:" pattern)
-     (list 'Question (restore-question subpattern))]
-
-    [(list operation args ...)
-     (debug "restore-question recur:" pattern)
-     (cons operation (map restore-question args))]
-
-    [otherwise
-     (debug "restore-question otherwise:" pattern)
-     otherwise]))
 
 (define (parser-header class-names
                        package-name
@@ -640,9 +379,19 @@ int genericParse(Object                        *output,
         return rc;                                                    // RETURN
     }
 
-    TokenIter begin = tokens.begin();
+    TokenIter tokenIter = tokens.begin();
 
-    return read(output, &begin, tokens.end(), &errorStream);
+    if (int rc = read(output, &tokenIter, tokens.end(), &errorStream))
+    {
+        // TODO
+    }
+
+    if (tokenIter != tokens.end())
+    {
+        // TODO
+    }
+
+    return 0;
 }
 
 template <typename Member>
