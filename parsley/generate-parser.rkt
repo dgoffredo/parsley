@@ -91,6 +91,93 @@
     numeric-read-contract))
 
 (define (numeric-read-template token-class ns)
+<<<<<<< HEAD
+=======
+  @~a{
+template <typename Number, typename NumberParser>
+int readNumeric(Number               *output,
+                @|token-class|::Kind  tokenKind,
+                TokenIter            *tokenIterPtr,
+                TokenIter             endTokens,
+                bsl::ostream         *errors
+                NumberParser          parseNumber)
+{
+    BSLS_ASSERT(tokenIterPtr);
+
+    const char *const name = @|ns|bsls::NameOf<Number>::name();
+    TokenIter         tokenIter(*tokenIterPtr);
+    bsl::string       value;
+    if (const int rc =
+            read(&value, tokenKind, &tokenIter, endTokens, errors)) {
+        if (errors) {
+            *errors << "Unable to read a " << name << " from a token of the "
+                       " kind " << tokenKind << " because reading the token "
+                       "itself failed.\n";
+        }
+        return rc;
+    }
+
+    BSLS_ASSERT(*tokenIterPtr != endTokens);
+
+    const @|token-class|&  token = **tokenIterPtr;
+    Number                 parsedValue;
+    @|ns|bslstl::StringRef remainderOrErrorLocation;
+    if (const int rc = parseNumber(&parsedValue,
+                                   &remainderOrErrorLocation,
+                                   token.d_value))
+    {
+        if (errors) {
+            *errors << "Unable to convert " << quoted(token.d_value)
+                    << " to a " << name << ". Error occurred beginning at "
+                    << quoted(remainderOrErrorLocation) << '\n';
+        }
+        return rc;
+    }
+
+    if (!remainderOrErrorLocation.empty()) {
+        if (errors) {
+            *errors << "Parsed a " << name << ' ' << parsedValue << " from "
+                    << quoted(token.d_value)
+                    << " without consuming the entire string. "
+                    << quoted(remainderOrErrorLocation) << " remains.\n";
+        }
+        return 1;
+    }
+
+    if (output) {
+        *output = parsedValue;
+    }
+
+    *tokenIterPtr = tokenIter;
+    return 0;
+}
+
+#define DEFINE_NUMERIC_READ(TYPE, FUNC)                                       \
+    int read(TYPE                 *output,                                    \
+             @|token-class|::Kind  tokenKind,                                 \
+             TokenIter            *tokenIterPtr,                              \
+             TokenIter             endTokens,                                 \
+             bsl::ostream         *errors)                                    \
+    {                                                                         \
+        using namespace @|ns|bdlf::PlaceHolders;                              \
+                                                                              \
+        return readNumeric(output,                                            \
+                           tokenKind,                                         \
+                           tokenIterPtr,                                      \
+                           endTokens,                                         \
+                           errors,                                            \
+                           @|ns|bdlf::BindUtil::bind(                         \
+                               &@|ns|bdlb::NumericParserUtil::FUNC,           \
+                               _1,    /* output value */                      \
+                               _2,    /* output remainder or error */         \
+                               _3));  /* input */                             \
+    }
+
+DEFINE_NUMERIC_READ(int, parseInt)
+})
+
+(define (numeric-read-macro token-class ns)
+>>>>>>> 63b5db0872cf0d27f906beee441553f624dc0543
   @~a{
 template <typename Number, typename NumberParser>
 int readNumeric(Number               *output,
