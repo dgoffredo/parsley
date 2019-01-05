@@ -1,5 +1,5 @@
-#ifndef INCLUDED_PACKAGE_LEXER
-#define INCLUDED_PACKAGE_LEXER
+#ifndef INCLUDED_SNAZZY_LEXER
+#define INCLUDED_SNAZZY_LEXER
 
 #include <bdlb_literalutil.h>
 
@@ -17,7 +17,7 @@
 
 namespace BloombergLP {
 namespace bslma { class Allocator; }
-namespace package {
+namespace snazzy {
 
                             // =================
                             // struct LexerToken
@@ -30,7 +30,7 @@ struct LexerToken {
     // corresponding to the token.
 
     // TYPES
-    enum Kind { e_TOKEN_6, e_TOKEN_5, e_TOKEN_4, e_TOKEN_3, e_TOKEN_2, e_TOKEN_1, e_NUMBER, e_IDENTIFIER };
+    enum Kind { e_TOKEN_9, e_TOKEN_8, e_TOKEN_7, e_TOKEN_6, e_TOKEN_5, e_TOKEN_4, e_TOKEN_3, e_TOKEN_2, e_TOKEN_1, e_IDENTIFIER, e_STRING, e_REGEX, e_EMPTY, e_COMMENT, e_BLANK_LINE, e_WS_LEFT, e_WS_END };
 
     // PUBLIC DATA
     Kind                   d_kind;

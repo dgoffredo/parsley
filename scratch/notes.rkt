@@ -1,4 +1,4 @@
-(struct reader-function (name output-type reader) #:prefab)
+(struct reader-function (name output-type reader) #:transparent)
 ; Will produce one of:
 ;
 ;     int @name(@output-type *output,
@@ -22,9 +22,9 @@
 ;         ...
 ;     }
 ;
-(struct reader/base          (pattern)                          #:prefab)
-(struct reader/compound      reader/base (readers)              #:prefab)
-(struct reader/concatenation reader/compound ()                 #:prefab)
+(struct reader/base          (pattern)                          #:transparent)
+(struct reader/compound      reader/base (readers)              #:transparent)
+(struct reader/concatenation reader/compound ()                 #:transparent)
 ; For each reader,
 ; If it's a term or a token or a token in a term,
 ;     // <excerpt from the grammar...>
@@ -67,7 +67,7 @@
 ;         RESET(output, constant);
 ;     }
 ;
-(struct reader/alternation   reader/compound ()                 #:prefab)
+(struct reader/alternation   reader/compound ()                 #:transparent)
 ; Try each reader, and continue only if the reader fails. If all of the readers
 ; fail, then the whole fails. None of the readers will be questions or stars,
 ; except for one special case: It might be that the last reader is starred. In
@@ -146,14 +146,14 @@
 ;
 ; A choice type can't have an array in it, but a non-choice alternation could
 ; end in a star.
-(struct reader/star          reader/base (term)                 #:prefab)
+(struct reader/star          reader/base (term)                 #:transparent)
 ; As seen above,
 ;
 ;     while (read(...))
 ;         ;
 ;     RESET(...);  // maybe
 ;
-(struct reader/question      reader/base (term)                 #:prefab)
+(struct reader/question      reader/base (term)                 #:transparent)
 ; Either
 ;
 ;     read(...);
@@ -164,16 +164,16 @@
 ;         RESET(...);
 ;     }
 ;
-(struct reader/term          reader/base (term-output function) #:prefab)
+(struct reader/term          reader/base (term-output function) #:transparent)
 ; This is tells you how to form the "read" call (or "readSomething_N" call),
 ; including what to output (which, in turn, tells you whether you need RESET).
 ; There's an annoying difference between passing zero as output and not having
 ; an output parameter at all. To tell the difference, inspect `function`.
-(struct reader/token         reader/base (name)                 #:prefab)
+(struct reader/token         reader/base (name)                 #:transparent)
 ; There's a set of overloads of `read` that take a token `Kind` as the second
 ; argument. The enumeration value name can be derived from `name` (e.g. "foo"
 ; -> "e_FOO").
-(struct reader/enumeration   reader/base (class-name function)  #:prefab)
+(struct reader/enumeration   reader/base (class-name function)  #:transparent)
 ; This
 ;
 ;     (reader-function

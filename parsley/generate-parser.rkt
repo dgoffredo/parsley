@@ -1,7 +1,6 @@
 #lang at-exp racket
 
-(provide reader-functions ; TODO debugging
-         parser-header)
+(provide (all-defined-out)) ; TODO debugging
 
 (require "productions.rkt"
          "types.rkt"
@@ -63,14 +62,14 @@
 }})
 
 (define (numeric-read-declaration cpp-type token-class)
-  @~a{int read(@cpp-type              *output,
-         @|token-class|::Kind  tokenKind,
-         TokenIter            *token,
-         TokenIter             endTokens,
-         bsl::ostream         *errors);})
+  @~a{int read(@cpp-type            *output,
+               @|token-class|::Kind  tokenKind,
+               TokenIter            *token,
+               TokenIter             endTokens,
+               bsl::ostream         *errors);})
 
 (define numeric-read-contract
-  @~a{
+  "
     // If the specified 'token' refers to a token having the specified
     // 'tokenKind', then increment the token referred to by 'token', and if
     // additionally 'output' is not zero, convert the matching token into the
@@ -80,104 +79,16 @@
     // token is not convertible to the type of 'output'. On failure, if the
     // specified 'errors' is not zero, write a diagnostic to 'errors'
     // describing the failure.
-})
+")
 
 (define (numeric-read-declarations cpp-types token-class)
   (~a
     (string-join* "\n\n" 
       (for/list ([type cpp-types])
         (numeric-read-declaration type token-class)))
-    "\n    "
     numeric-read-contract))
 
-(define (numeric-read-template token-class ns)
-<<<<<<< HEAD
-=======
-  @~a{
-template <typename Number, typename NumberParser>
-int readNumeric(Number               *output,
-                @|token-class|::Kind  tokenKind,
-                TokenIter            *tokenIterPtr,
-                TokenIter             endTokens,
-                bsl::ostream         *errors
-                NumberParser          parseNumber)
-{
-    BSLS_ASSERT(tokenIterPtr);
-
-    const char *const name = @|ns|bsls::NameOf<Number>::name();
-    TokenIter         tokenIter(*tokenIterPtr);
-    bsl::string       value;
-    if (const int rc =
-            read(&value, tokenKind, &tokenIter, endTokens, errors)) {
-        if (errors) {
-            *errors << "Unable to read a " << name << " from a token of the "
-                       " kind " << tokenKind << " because reading the token "
-                       "itself failed.\n";
-        }
-        return rc;
-    }
-
-    BSLS_ASSERT(*tokenIterPtr != endTokens);
-
-    const @|token-class|&  token = **tokenIterPtr;
-    Number                 parsedValue;
-    @|ns|bslstl::StringRef remainderOrErrorLocation;
-    if (const int rc = parseNumber(&parsedValue,
-                                   &remainderOrErrorLocation,
-                                   token.d_value))
-    {
-        if (errors) {
-            *errors << "Unable to convert " << quoted(token.d_value)
-                    << " to a " << name << ". Error occurred beginning at "
-                    << quoted(remainderOrErrorLocation) << '\n';
-        }
-        return rc;
-    }
-
-    if (!remainderOrErrorLocation.empty()) {
-        if (errors) {
-            *errors << "Parsed a " << name << ' ' << parsedValue << " from "
-                    << quoted(token.d_value)
-                    << " without consuming the entire string. "
-                    << quoted(remainderOrErrorLocation) << " remains.\n";
-        }
-        return 1;
-    }
-
-    if (output) {
-        *output = parsedValue;
-    }
-
-    *tokenIterPtr = tokenIter;
-    return 0;
-}
-
-#define DEFINE_NUMERIC_READ(TYPE, FUNC)                                       \
-    int read(TYPE                 *output,                                    \
-             @|token-class|::Kind  tokenKind,                                 \
-             TokenIter            *tokenIterPtr,                              \
-             TokenIter             endTokens,                                 \
-             bsl::ostream         *errors)                                    \
-    {                                                                         \
-        using namespace @|ns|bdlf::PlaceHolders;                              \
-                                                                              \
-        return readNumeric(output,                                            \
-                           tokenKind,                                         \
-                           tokenIterPtr,                                      \
-                           endTokens,                                         \
-                           errors,                                            \
-                           @|ns|bdlf::BindUtil::bind(                         \
-                               &@|ns|bdlb::NumericParserUtil::FUNC,           \
-                               _1,    /* output value */                      \
-                               _2,    /* output remainder or error */         \
-                               _3));  /* input */                             \
-    }
-
-DEFINE_NUMERIC_READ(int, parseInt)
-})
-
-(define (numeric-read-macro token-class ns)
->>>>>>> 63b5db0872cf0d27f906beee441553f624dc0543
+(define (numeric-read-define-template token-class ns)
   @~a{
 template <typename Number, typename NumberParser>
 int readNumeric(Number               *output,
@@ -202,7 +113,7 @@ int readNumeric(Number               *output,
         return rc;                                                     // RETURN
     }
 
-    // If we had reached the end, the 'read' call above would have failed.
+    // If the end had been reached, then 'read' would have failed above.
     BSLS_ASSERT(*tokenIterPtr != endTokens);
 
     const @|token-class|&  token = **tokenIterPtr;
@@ -239,33 +150,38 @@ int readNumeric(Number               *output,
     *tokenIterPtr = tokenIter;
     return 0;
 }
-
-#define DEFINE_NUMERIC_READ(TYPE, FUNC)                                       \
-    int read(TYPE                 *output,                                    \
-             @|token-class|::Kind  tokenKind,                                 \
-             TokenIter            *tokenIterPtr,                              \
-             TokenIter             endTokens,                                 \
-             bsl::ostream         *errors)                                    \
-    {                                                                         \
-        using namespace @|ns|bdlf::PlaceHolders;                              \
-                                                                              \
-        return readNumeric(output,                                            \
-                           tokenKind,                                         \
-                           tokenIterPtr,                                      \
-                           endTokens,                                         \
-                           errors,                                            \
-                           @|ns|bdlf::BindUtil::bind(                         \
-                               &@|ns|bdlb::NumericParserUtil::FUNC,           \
-                               _1,    /* output value */                      \
-                               _2,    /* output remainder or error */         \
-                               _3));  /* input */                             \
-    }
-
-DEFINE_NUMERIC_READ(int, parseInt)
 })
 
-(define (numeric-read-macro token-class ns)
-  @~a{TODO})
+(define (numeric-read-define-macro token-class ns)
+  @~a{
+#define DEFINE_NUMERIC_READ(TYPE, FUNC)                                        \
+    int FUNC(TYPE                          *output,                            \
+             @|ns|bslstl::StringRef        *remainderOrErrorLocation,          \
+             const @|ns|bslstl::StringRef&  input)                             \
+    {                                                                          \
+        /* This wrapper function prevents overload ambiguity. */               \
+        return @|ns|bdlb::NumericParseUtil::FUNC(output,                       \
+                                                 remainderOrErrorLocation,     \
+                                                 input);                       \
+    }                                                                          \
+                                                                               \
+    int read(TYPE                 *output,                                     \
+             @|token-class|::Kind  tokenKind,                                  \
+             TokenIter            *tokenIterPtr,                               \
+             TokenIter             endTokens,                                  \
+             bsl::ostream         *errors)                                     \
+    {                                                                          \
+        return readNumeric(output,                                             \
+                           tokenKind,                                          \
+                           tokenIterPtr,                                       \
+                           endTokens,                                          \
+                           errors,                                             \
+                           &FUNC);                                             \
+    }
+})
+
+(define (numeric-read-undefine-macro)
+  "\n#undef DEFINE_NUMERIC_READER\n")
 
 (define (numeric-read-definition cpp-type parser-func-name)
     @~a{DEFINE_NUMERIC_READ(@cpp-type, @parser-func-name)
@@ -283,12 +199,15 @@ DEFINE_NUMERIC_READ(int, parseInt)
 
 (define (numeric-read-definitions cpp-types token-class ns)
   (~a
-    (numeric-read-macro token-class ns) ; TODO
-    "\n"
+    (numeric-read-define-template token-class ns)
+    "\n\n"
+    (numeric-read-define-macro token-class ns)
+    "\n\n"
     (string-join* "\n"
       (for/list ([type cpp-types])
         (numeric-read-definition type (type->func-name type))))
-    "\n#undef DEFINE_NUMERIC_READER\n"))
+    "\n"
+    (numeric-read-undefine-macro)))
 
 (define (parser-header class-names
                        package-name

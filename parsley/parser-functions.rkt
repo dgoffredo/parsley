@@ -26,31 +26,34 @@
 ; This struct describes a C++ function that will appear in the anonymous
 ; namespace of the parser's implementation. Each reader-function reads either
 ; a class or some part of a class.
-(struct reader-function (name output-type reader) #:prefab)
+(struct reader-function (name output-type reader) #:transparent)
 
 ; These structs describe parts of a reader-function. Each node in a production
 ; rule pattern corresponds to a strategy for reading that production from
 ; input, e.g. (Concatenation A B?) produces a concatenation-reader whose
 ; readers are a term-reader and a question-reader, respectively.
-(struct reader/base          (pattern)             #:prefab)
-(struct reader/compound      reader/base (readers) #:prefab)
-(struct reader/concatenation reader/compound ()    #:prefab)
-(struct reader/alternation   reader/compound ()    #:prefab)
-(struct reader/star          reader/base (term)    #:prefab)
-(struct reader/question      reader/base (term)    #:prefab)
+(struct reader/base          (pattern)             #:transparent)
+(struct reader/compound      reader/base (readers) #:transparent)
+(struct reader/concatenation reader/compound ()    #:transparent)
+(struct reader/alternation   reader/compound ()    #:transparent)
+(struct reader/star          reader/base (term)    #:transparent)
+(struct reader/question      reader/base (term)    #:transparent)
 ; The term-output field of reader/term can be any of:
+;
 ; - 'forward, indicating that the output parameter of the calling function
 ;   is forwarded to it, or
 ; - a member-accessor object, indicating that the output goes to a member of
 ;   the output parameter of the calling function, or
 ; - #f, indicating no output (pass a null pointer for the output parameter).
+;
 ; The function field of reader/term can be any of:
+;
 ; - a string naming the function, or
 ; - a reader/token object indicating the token to be read.
-(struct reader/term        reader/base (term-output function) #:prefab)
-(struct reader/token       reader/base (name)                 #:prefab)
-(struct reader/enumeration reader/base (class-name function)  #:prefab)
-(struct member-accessor    (name)                             #:prefab)
+(struct reader/term        reader/base (term-output function) #:transparent)
+(struct reader/token       reader/base (name)                 #:transparent)
+(struct reader/enumeration reader/base (class-name function)  #:transparent)
+(struct member-accessor    (name)                             #:transparent)
 
 (define (alternation/concatenation? symbol)
   (member symbol '(Alternation Concatenation)))

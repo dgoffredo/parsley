@@ -15,7 +15,6 @@ SumOrDiffTerm  ::=  prodOrQuot:ProdOrQuot
 
 ProdOrQuot  ::=  left:Atom (op:TimesOrDividedBy right:Atom)+
 
-# This wouldn't really fly... how would the generator rename these for C++?
 enumeration PlusOrMinus  ::=  "+" | "-"
 
 enumeration TimesOrDividedBy  ::=  "*" | "/"
