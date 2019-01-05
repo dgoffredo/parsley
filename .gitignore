@@ -1,2 +1,3 @@
-# empty file used by Makefile to remember whether it's done something
+# empty files used by Makefile to remember whether it's done something
 .make-init-ran-already
+.deps-installed

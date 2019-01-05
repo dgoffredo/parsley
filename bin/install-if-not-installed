@@ -1,0 +1,10 @@
+#!/bin/bash
+
+package=$1
+
+is_installed() {
+    package=$1
+    raco pkg show --user --long | grep "^$package\s" >/dev/null 2>&1 
+}
+
+is_installed $package || raco pkg install $package

@@ -2,7 +2,7 @@
 BUILD_DIR = build/$(shell uname)
 SOURCES = $(shell find . -type f -name '*.rkt') README.md
 
-$(BUILD_DIR)/bin/parsley: $(SOURCES) .make-init-ran-already
+$(BUILD_DIR)/bin/parsley: $(SOURCES) .make-init-ran-already .deps-installed
 	mkdir -p $(BUILD_DIR)
 	raco exe -o $(BUILD_DIR)/parsley parsley/main.rkt
 	raco distribute $(BUILD_DIR) $(BUILD_DIR)/parsley
@@ -12,13 +12,20 @@ $(BUILD_DIR)/bin/parsley: $(SOURCES) .make-init-ran-already
 	git config core.hooksPath .githooks
 	touch .make-init-ran-already
 
+.deps-installed:
+	bin/install-if-not-installed sxml
+	bin/install-if-not-installed threading-lib
+	bin/install-if-not-installed graph
+	bin/install-if-not-installed brag
+	touch .deps-installed
+
 .PHONY: build init test package examples clean
 
 ## Create self-contained distribution
 build: $(BUILD_DIR)/bin/parsley
 
-## Initialize git hooks
-init: .make-init-ran-already
+## Initialize git hooks and dependencies
+init: .make-init-ran-already .deps-installed
 
 ## Run all of the unit tests
 test: init
