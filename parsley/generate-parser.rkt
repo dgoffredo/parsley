@@ -84,6 +84,7 @@
 
 (define (numeric-read-declarations cpp-types token-class)
   (~a
+    "\n"
     (string-join* "\n\n" 
       (for/list ([type cpp-types])
         (numeric-read-declaration type token-class)))
@@ -111,7 +112,7 @@ int readNumeric(Number               *output,
                        " kind " << tokenKind << " because reading the token "
                        "itself failed.\n";
         }
-        return rc;                                                     // RETURN
+        return rc;                                                    // RETURN
     }
 
     // If the end had been reached, then 'read' would have failed above.
@@ -130,7 +131,7 @@ int readNumeric(Number               *output,
                     << " to a " << name << ". Error occurred beginning at "
                     << quoted(remainderOrErrorLocation) << '\n';
         }
-        return rc;                                                     // RETURN
+        return rc;                                                    // RETURN
     }
 
     if (!remainderOrErrorLocation.empty()) {
@@ -141,7 +142,7 @@ int readNumeric(Number               *output,
                     << " without consuming the entire string. "
                     << quoted(remainderOrErrorLocation) << " remains.\n";
         }
-        return 1;                                                      // RETURN
+        return 1;                                                     // RETURN
     }
 
     if (output) {
@@ -155,29 +156,29 @@ int readNumeric(Number               *output,
 
 (define (numeric-read-define-macro token-class ns)
   @~a{
-#define DEFINE_NUMERIC_READ(TYPE, FUNC)                                        \
-    int FUNC(TYPE                          *output,                            \
-             @|ns|bslstl::StringRef        *remainderOrErrorLocation,          \
-             const @|ns|bslstl::StringRef&  input)                             \
-    {                                                                          \
-        /* This wrapper function prevents overload ambiguity. */               \
-        return @|ns|bdlb::NumericParseUtil::FUNC(output,                       \
-                                                 remainderOrErrorLocation,     \
-                                                 input);                       \
-    }                                                                          \
-                                                                               \
-    int read(TYPE                 *output,                                     \
-             @|token-class|::Kind  tokenKind,                                  \
-             TokenIter            *tokenIterPtr,                               \
-             TokenIter             endTokens,                                  \
-             bsl::ostream         *errors)                                     \
-    {                                                                          \
-        return readNumeric(output,                                             \
-                           tokenKind,                                          \
-                           tokenIterPtr,                                       \
-                           endTokens,                                          \
-                           errors,                                             \
-                           &FUNC);                                             \
+#define DEFINE_NUMERIC_READ(TYPE, FUNC)                                       \
+    int FUNC(TYPE                          *output,                           \
+             @|ns|bslstl::StringRef        *remainderOrErrorLocation,         \
+             const @|ns|bslstl::StringRef&  input)                            \
+    {                                                                         \
+        /* This wrapper function prevents overload ambiguity. */              \
+        return @|ns|bdlb::NumericParseUtil::FUNC(output,                      \
+                                                 remainderOrErrorLocation,    \
+                                                 input);                      \
+    }                                                                         \
+                                                                              \
+    int read(TYPE                 *output,                                    \
+             @|token-class|::Kind  tokenKind,                                 \
+             TokenIter            *tokenIterPtr,                              \
+             TokenIter             endTokens,                                 \
+             bsl::ostream         *errors)                                    \
+    {                                                                         \
+        return readNumeric(output,                                            \
+                           tokenKind,                                         \
+                           tokenIterPtr,                                      \
+                           endTokens,                                         \
+                           errors,                                            \
+                           &FUNC);                                            \
     }
 })
 
@@ -272,8 +273,8 @@ struct @parser-class {
     'unsignedShort      "unsigned short"))
 
 (define-syntax-rule (only-when when? body ...)
-  ; Since `(void)` prints as `#<void>`, `only-when` is used as an alternative to
-  ; `when`."
+  ; Since `(void)` prints as `#<void>`, `only-when` is used as an alternative
+  ; to `when`."
   (if when?
     (begin body ...)
     ""))
@@ -312,12 +313,27 @@ struct @parser-class {
 (define (any-types-contain-scalar? types)
   (any (type-category-finder scalar) types))
 
+(define (escape-multi-line-comment inside-text)
+  "This is just to silence -Wcomment, which will warn if there's a /* inside of
+   a /* comment."
+  (string-replace inside-text "*/" "*\\/"))
+
+(define (comment-grammar grammar-text)
+  @~a{// clang-format off
+//
+// This component parses the productions from the following Parsley grammar:
+/*
+@(escape-multi-line-comment grammar-text)
+*/
+// clang-format on})
+
 (define (parser-source classes
                        tokens
                        parser-class
                        lexer-class
                        package-name
-                       enterprise-namespace)
+                       enterprise-namespace
+                       grammar-text)
   (let* ([ns (calculate-bloomberg-prefix enterprise-namespace)]
          [class-names (map schema/base-name classes)]
          [parser-decl (~a "struct " parser-class)]
@@ -355,6 +371,8 @@ struct @parser-class {
 #include <bsl_ostream.h>
 #include <bsl_vector.h>
 
+@(comment-grammar grammar-text)
+
 namespace @enterprise-namespace {
 namespace @package-name {
 namespace {
@@ -390,19 +408,8 @@ int read(bsl::string      *output,
     // 'tokenKind' or is equal to the specified 'endTokens'. On failure, if the
     // specified 'errors' is not zero, write a diagnostic to 'errors'
     // describing how reading failed.
-
 @(only-when (not (empty? numeric-token-cpp-types))
-   @~a{
-    @(numeric-read-declarations class-names token-class)
-    // If the specified 'token' refers to a token having the specified
-    // 'tokenKind', then increment 'token', and if additionally 'output' is not
-    // zero, convert the matching token into the appropriate type and load the
-    // resulting value into 'output'. Return zero on success or a nonzero value
-    // if: 'token' does not refer to a token of kind 'tokenKind', 'token' is
-    // equal to the specified 'endTokens', or the token is not convertible to
-    // the type of 'output'. On failure, if the specified 'errors' is not zero,
-    // write a diagnostic to 'errors' describing the failure.
-})
+   (numeric-read-declarations numeric-token-cpp-types token-class))
 @(token-ignore-definition tokens token-class)
 
 bsl::string quoted(const @|ns|bslstl::StringRef& input)
@@ -428,6 +435,9 @@ int genericParse(Object                        *output,
 {
     bsl::vector<@|token-class|> tokens;
     if (const int rc = tokenize(&tokens, input, errorStream, lexer)) {
+        const char *const name = @|ns|bsls::NameOf<Object>::name();
+        errorStream << "Unable to parse a " << name << "; wasn't able to lex "
+                       "all of the input.";
         return rc;                                                    // RETURN
     }
 
@@ -435,12 +445,17 @@ int genericParse(Object                        *output,
 
     if (int rc = read(output, &tokenIter, tokens.end(), &errorStream))
     {
-        // TODO
+        const char *const name = @|ns|bsls::NameOf<Object>::name();
+        errorStream << "Unable to parse a " << name << "; wasn't able to read "
+                       "one from the input.";
+        return rc;                                                    // RETURN
     }
 
     if (tokenIter != tokens.end())
     {
-        // TODO
+        const char *const name = @|ns|bsls::NameOf<Object>::name();
+        errorStream << "Parsed a " << name << " but didn't exhaust the input.";
+        return 3;                                                     // RETURN
     }
 
     return 0;

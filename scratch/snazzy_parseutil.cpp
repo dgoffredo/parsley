@@ -10,6 +10,55 @@
 #include <bsl_ostream.h>
 #include <bsl_vector.h>
 
+// clang-format off
+//
+// This component parses the productions from the following Parsley grammar:
+/*
+Grammar  ::=  rules:Rule (BLANK_LINE+ rules:Rule)* BLANK_LINE*
+
+Rule  ::=  ignore:"ignore"? name:IDENTIFIER ("::="|":") pattern:Pattern
+
+Pattern  ::=  alternation:Alternation      # one from multiple options
+          |   concatenation:Concatenation  # one or more subpatterns
+
+Alternation  ::=  patterns:PatternTerm ("|" patterns:PatternTerm)+
+
+Concatenation  ::=  patterns:PatternTerm+
+
+PatternTerm  ::=  bound:BoundPatternTerm
+              |   unbound:QuantifiedPatternTerm
+
+BoundPatternTerm  ::=  name:IDENTIFIER ":" term:QuantifiedPatternTerm
+
+QuantifiedPatternTerm  ::=  star:UnquantifiedPatternTerm "*"
+                        |   plus:UnquantifiedPatternTerm "+"
+                        |   question:UnquantifiedPatternTerm "?"
+                        |   term:UnquantifiedPatternTerm
+
+UnquantifiedPatternTerm  ::=  literal:STRING
+                          |   regex:REGEX
+                          |   rule:IDENTIFIER
+                          |   empty:EMPTY
+                          |   "(" pattern:Pattern ")"
+
+IDENTIFIER  ::=  /[a-zA-Z_][0-9a-zA-Z_]*\/
+
+STRING  ::=  /"([^\\"]|\\.)*"/
+
+REGEX  ::=  /\/([^\\\/]|\\.)*\//
+
+EMPTY  ::=  /\(\)/
+
+ignore COMMENT  ::=  /\(\*([^*]|\*[^)])*\*\)/
+
+BLANK_LINE  ::=  /\s*\n\s*\n\s*\/
+
+ignore WS_LEFT  ::=  /\s+(?=\S)/
+
+ignore WS_END  ::=  /\s+$/
+*/
+// clang-format on
+
 namespace BloombergLP {
 namespace snazzy {
 namespace {
@@ -83,7 +132,6 @@ int read(bsl::string      *output,
     // specified 'errors' is not zero, write a diagnostic to 'errors'
     // describing how reading failed.
 
-
 bool ignore(LexerToken::Kind tokenKind)
     // Return whether the specified 'tokenkind' ought to be ignored by the
     // parser.
@@ -120,6 +168,9 @@ int genericParse(Object                        *output,
 {
     bsl::vector<LexerToken> tokens;
     if (const int rc = tokenize(&tokens, input, errorStream, lexer)) {
+        const char *const name = bsls::NameOf<Object>::name();
+        errorStream << "Unable to parse a " << name << "; wasn't able to lex "
+                       "all of the input.";
         return rc;                                                    // RETURN
     }
 
@@ -127,12 +178,17 @@ int genericParse(Object                        *output,
 
     if (int rc = read(output, &tokenIter, tokens.end(), &errorStream))
     {
-        // TODO
+        const char *const name = bsls::NameOf<Object>::name();
+        errorStream << "Unable to parse a " << name << "; wasn't able to read "
+                       "one from the input.";
+        return rc;                                                    // RETURN
     }
 
     if (tokenIter != tokens.end())
     {
-        // TODO
+        const char *const name = bsls::NameOf<Object>::name();
+        errorStream << "Parsed a " << name << " but didn't exhaust the input.";
+        return 3;                                                     // RETURN
     }
 
     return 0;

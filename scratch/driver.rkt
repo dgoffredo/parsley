@@ -76,5 +76,6 @@
                  "ParseUtil"
                  "Lexer"
                  "snazzy"
-                 "BloombergLP")
+                 "BloombergLP"
+                 parsley-text)
   display)
