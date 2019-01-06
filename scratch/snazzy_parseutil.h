@@ -1,5 +1,5 @@
-#ifndef INCLUDED_SNAZZY_PARSER
-#define INCLUDED_SNAZZY_PARSER
+#ifndef INCLUDED_SNAZZY_PARSEUTIL
+#define INCLUDED_SNAZZY_PARSEUTIL
 
 #include <bsl_iosfwd.h>
 #include <bsl_string.h>
@@ -17,7 +17,7 @@ class QuantifiedPatternTerm;
 class Rule;
 class UnquantifiedPatternTerm;
 
-struct Parser {
+struct ParseUtil {
     // This 'struct' provides a namespace of functions used to parse instances
     // of generated types from text.
 

@@ -17,7 +17,12 @@
       path-only))
 
 (define parsley-file
-  (build-path this-dir 'up "parsley" "test-grammars" "parsley.parsley"))
+  (let ([which (vector-ref (current-command-line-arguments) 0)])
+    (build-path this-dir 
+                'up 
+                "parsley" 
+                "test-grammars" 
+                (string-append which ".parsley"))))
 
 (define parsley-text
   (port->string (open-input-file parsley-file)))
@@ -26,9 +31,9 @@
   (for/list ([token (lex (open-input-string parsley-text))])
       token))
 
-(define (to-file-named name object)
+(define (to-file-named name object [printer pretty-print])
   (with-output-to-file (build-path this-dir name) #:exists 'replace
-    (lambda () (pretty-print object))))
+    (lambda () (printer object))))
 
 (to-file-named "tokens.rkt" raw-tokens)
 
@@ -54,11 +59,22 @@
 
 (to-file-named "functions.rkt" functions)
 
-(with-output-to-file (build-path this-dir "snazzy_parser.h") #:exists 'replace
-  (lambda ()
-    (display 
-      (parser-header (map schema/base-name types)
-                     "snazzy"
-                     "BloombergLP" 
-                     "Parser" 
-                     "Lexer"))))
+(to-file-named
+  "snazzy_parseutil.h" 
+  (parser-header (map schema/base-name types)
+                 "snazzy"
+                 "BloombergLP" 
+                 "ParseUtil" 
+                 "Lexer")
+  display)
+
+
+(to-file-named 
+  "snazzy_parseutil.cpp"
+  (parser-source types
+                 tokens
+                 "ParseUtil"
+                 "Lexer"
+                 "snazzy"
+                 "BloombergLP")
+  display)

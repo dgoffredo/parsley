@@ -149,9 +149,9 @@
 (struct reader/star          reader/base (term)                 #:transparent)
 ; As seen above,
 ;
-;     while (read(...))
+;     while (!read(...))
 ;         ;
-;     RESET(...);  // maybe
+;     RESET(...);  // maybe (if reading into a MEMBER)
 ;
 (struct reader/question      reader/base (term)                 #:transparent)
 ; Either

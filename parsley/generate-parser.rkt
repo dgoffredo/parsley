@@ -9,7 +9,8 @@
          "applicable-dict.rkt"
          "debug.rkt"
          "parser-functions.rkt"
-         threading)
+         threading
+         srfi/1)  ; list procedures, e.g. `any`
 
 (define (generate-parser . TODO)
   'TODO)
@@ -270,6 +271,47 @@ struct @parser-class {
     'unsignedInt        "unsigned int"
     'unsignedShort      "unsigned short"))
 
+(define-syntax-rule (only-when when? body ...)
+  ; Since `(void)` prints as `#<void>`, `only-when` is used as an alternative to
+  ; `when`."
+  (if when?
+    (begin body ...)
+    ""))
+
+; The following five expanders, macros, and procedures are used to decide
+; which overloads of the `getMemberPtr` and `resetMember` templates will
+; appear in the output. Each template has an overload for `vector`,
+; `NullableValue`, and other. If there are no array members in the generated
+; types, though, then the `vector` overload is not needed, and etc. for the
+; other categories.
+
+(define-match-expander sequence-or-choice
+  ; This `match` syntax matches either of `schema/sequence` or `schema/choice`,
+  ; with the specified arguments.
+  (syntax-rules ()
+    [(_ args ...) (or (schema/sequence args ...) (schema/choice args ...))]))
+
+(define-syntax-rule (type-category-finder category)
+  ; This syntax expands to a lambda that will check a `schema/*` type's members
+  ; for a specified occurence category (`array`, `nullable`, `scalar`). The
+  ; lambda will return whether one is found.
+ (...  ; treat "..." literally
+   (match-lambda
+     [(sequence-or-choice _ _ (list (list _ types) ...))
+      (any
+        (match-lambda [(category _) #t] [_ #f])
+        types)]
+     [_ #f])))
+
+(define (any-types-contain-array? types)
+  (any (type-category-finder array) types))
+
+(define (any-types-contain-nullable? types)
+  (any (type-category-finder nullable) types))
+
+(define (any-types-contain-scalar? types)
+  (any (type-category-finder scalar) types))
+
 (define (parser-source classes
                        tokens
                        parser-class
@@ -287,6 +329,10 @@ struct @parser-class {
                            (string-join* "_")))]
          [parser-component (component-of parser-class)]
          [lexer-component (component-of lexer-class)]
+         [messages-component (component-of "messages")]  ; TODO?
+         [contains-array? (any-types-contain-array? classes)]
+         [contains-nullable? (any-types-contain-nullable? classes)]
+         [contains-scalar? (any-types-contain-scalar? classes)]
          [numeric-token-cpp-types
           (~>> tokens
                (map (match-lambda [(token _ _ (basic type) _) type]))
@@ -295,13 +341,14 @@ struct @parser-class {
                (map schema-token-type->cpp-type))])
     @~a{
 #include <@|parser-component|.h>
-#include <@|lexer-component|.h>
-
+@(~>> (list lexer-component messages-component)
+      (sort _ string<?)
+      (map (lambda (component) (~a "#include <" component ".h>\n")))
+      (string-join* ""))
 #include <bdlb_literalutil.h>
 @(if (empty? numeric-token-cpp-types)
    ""
    "#include <bdlb_numericparseutil.h>")
-
 #include <bsls_assert.h>
 #include <bsls_nameof.h>
 
@@ -317,7 +364,7 @@ typedef bsl::vector<@|token-class|>::const_iterator TokenIter;
 @(string-join* "\n\n"
   (for/list ([name class-names])
     @~a{
-int read(@name        *output
+int read(@name        *output,
          TokenIter    *token,
          TokenIter     endTokens,
          bsl::ostream *errors);}))
@@ -344,8 +391,7 @@ int read(bsl::string      *output,
     // specified 'errors' is not zero, write a diagnostic to 'errors'
     // describing how reading failed.
 
-@(if (empty? numeric-token-cpp-types)
-   ""
+@(only-when (not (empty? numeric-token-cpp-types))
    @~a{
     @(numeric-read-declarations class-names token-class)
     // If the specified 'token' refers to a token having the specified
@@ -398,7 +444,9 @@ int genericParse(Object                        *output,
     }
 
     return 0;
-}
+}@(only-when contains-scalar?
+   @~a{
+
 
 template <typename Member>
 Member *getMemberPtr(Member& member)
@@ -406,7 +454,9 @@ Member *getMemberPtr(Member& member)
     // this component.
 {
     return &member;
-}
+}})@(only-when contains-nullable?
+   @~a{
+
 
 template <typename Member>
 Member *getMemberPtr(@|ns|bdlb::NullableValue<Member>& member)
@@ -414,7 +464,9 @@ Member *getMemberPtr(@|ns|bdlb::NullableValue<Member>& member)
     // 'member' of some class parsed by this component.
 {
     return &member.makeValueInplace();
-}
+}})@(only-when contains-array?
+   @~a{
+
 
 template <typename Member>
 Member *getMemberPtr(bsl::vector<Member>& member)
@@ -423,13 +475,17 @@ Member *getMemberPtr(bsl::vector<Member>& member)
 {
     member.emplace_back();
     return &member.back();
-}
+}})@(only-when contains-scalar?
+   @~a{
+
 
 template <typename Member>
 void resetMember(Member&)
     // Non-nullable, non-array members need no resetting.
 {
-}
+}})@(only-when contains-nullable?
+   @~a{
+
 
 template <typename Member>
 void resetMember(@|ns|bdlb::NullableValue<Member>& member)
@@ -438,7 +494,9 @@ void resetMember(@|ns|bdlb::NullableValue<Member>& member)
     // 'getMemberPtr'.
 {
     member.reset();
-}
+}})@(only-when contains-array?
+   @~a{
+
 
 template <typename Member>
 void resetMember(bsl::vector<Member>& member)
@@ -448,7 +506,7 @@ void resetMember(bsl::vector<Member>& member)
 {
     BSLS_ASSERT(!member.empty());
     member.pop_back();
-}
+}})
 
 #define MEMBER(OBJECT, ACCESSOR) \
     OBJECT ? getMemberPtr(OBJECT->ACCESSOR()) : 0
