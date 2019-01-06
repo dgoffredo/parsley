@@ -1,59 +1,30 @@
 '(Grammar
   (Rule
-   Grammar
-   (Concatenation
-    (Bound rules Rule)
-    (Star (Concatenation (Plus BLANK_LINE) (Bound rules Rule)))
-    (Star BLANK_LINE)))
-  (Rule
-   Rule
-   (Concatenation
-    (Question (Bound ignore "ignore"))
-    (Bound name IDENTIFIER)
-    (Alternation "::=" ":")
-    (Bound pattern Pattern)))
-  (Rule
-   Pattern
+   Expression
    (Alternation
-    (Bound alternation Alternation)
-    (Bound concatenation Concatenation)))
+    (Bound sumOrDiff SumOrDiff)
+    (Bound prodOrQuot ProdOrQuot)
+    (Bound atom Atom)))
   (Rule
-   Alternation
+   Atom
+   (Alternation
+    (Bound identifier IDENTIFIER)
+    (Bound number NUMBER)
+    (Concatenation "(" (Bound expression Expression) ")")))
+  (Rule
+   SumOrDiff
    (Concatenation
-    (Bound patterns PatternTerm)
-    (Plus (Concatenation "|" (Bound patterns PatternTerm)))))
-  (Rule Concatenation (Plus (Bound patterns PatternTerm)))
+    (Bound left SumOrDiffTerm)
+    (Plus (Concatenation (Bound op PlusOrMinus) (Bound right SumOrDiffTerm)))))
   (Rule
-   PatternTerm
-   (Alternation
-    (Bound bound BoundPatternTerm)
-    (Bound unbound QuantifiedPatternTerm)))
+   SumOrDiffTerm
+   (Alternation (Bound prodOrQuot ProdOrQuot) (Bound atom Atom)))
   (Rule
-   BoundPatternTerm
+   ProdOrQuot
    (Concatenation
-    (Bound name IDENTIFIER)
-    ":"
-    (Bound term QuantifiedPatternTerm)))
-  (Rule
-   QuantifiedPatternTerm
-   (Alternation
-    (Concatenation (Bound star UnquantifiedPatternTerm) "*")
-    (Concatenation (Bound plus UnquantifiedPatternTerm) "+")
-    (Concatenation (Bound question UnquantifiedPatternTerm) "?")
-    (Bound term UnquantifiedPatternTerm)))
-  (Rule
-   UnquantifiedPatternTerm
-   (Alternation
-    (Bound literal STRING)
-    (Bound regex REGEX)
-    (Bound rule IDENTIFIER)
-    (Bound empty EMPTY)
-    (Concatenation "(" (Bound pattern Pattern) ")")))
-  (Rule IDENTIFIER (regex "[a-zA-Z_][0-9a-zA-Z_]*"))
-  (Rule STRING (regex "\"([^\\\\\"]|\\\\.)*\""))
-  (Rule REGEX (regex "/([^\\\\/]|\\\\.)*/"))
-  (Rule EMPTY (regex "\\(\\)"))
-  (Rule ignore COMMENT (regex "\\(\\*([^*]|\\*[^)])*\\*\\)"))
-  (Rule BLANK_LINE (regex "\\s*\\n\\s*\\n\\s*"))
-  (Rule ignore WS_LEFT (regex "\\s+(?=\\S)"))
-  (Rule ignore WS_END (regex "\\s+$")))
+    (Bound left Atom)
+    (Plus (Concatenation (Bound op TimesOrDividedBy) (Bound right Atom)))))
+  (Rule enumeration PlusOrMinus (Alternation "+" "-"))
+  (Rule enumeration TimesOrDividedBy (Alternation "*" "/"))
+  (Rule decimal NUMBER (regex "(0|[1-9][0-9]*)(\\.[0-9]+)?"))
+  (Rule IDENTIFIER (regex "[^0-9][a-zA-Z0-9_\\-!@#$%^&*+=:/?~]*")))

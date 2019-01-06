@@ -1,238 +1,145 @@
 (list
- (token-struct 'IDENTIFIER 'Grammar #f #f #f #f #f)
+ (token-struct 'COMMENT " e.g. 3*(2 + 4 / 2 + 6) - 1\r" #f #f #f #f #t)
+ (token-struct 'WS_LEFT "\n" #f #f #f #f #t)
+ (token-struct 'COMMENT " ... which is 29\r" #f #f #f #f #t)
+ (token-struct 'WS_LEFT "\n" #f #f #f #f #t)
+ (token-struct 'IDENTIFIER 'Expression #f #f #f #f #f)
  (token-struct 'WS_LEFT "  " #f #f #f #f #t)
  "::="
  (token-struct 'WS_LEFT "  " #f #f #f #f #t)
- (token-struct 'IDENTIFIER 'rules #f #f #f #f #f)
+ (token-struct 'IDENTIFIER 'sumOrDiff #f #f #f #f #f)
  ":"
- (token-struct 'IDENTIFIER 'Rule #f #f #f #f #f)
- (token-struct 'WS_LEFT " " #f #f #f #f #t)
- "("
- (token-struct 'IDENTIFIER 'BLANK_LINE #f #f #f #f #f)
- "+"
- (token-struct 'WS_LEFT " " #f #f #f #f #t)
- (token-struct 'IDENTIFIER 'rules #f #f #f #f #f)
+ (token-struct 'IDENTIFIER 'SumOrDiff #f #f #f #f #f)
+ (token-struct 'WS_LEFT "\r\n             " #f #f #f #f #t)
+ "|"
+ (token-struct 'WS_LEFT "   " #f #f #f #f #t)
+ (token-struct 'IDENTIFIER 'prodOrQuot #f #f #f #f #f)
  ":"
- (token-struct 'IDENTIFIER 'Rule #f #f #f #f #f)
- ")"
- "*"
- (token-struct 'WS_LEFT " " #f #f #f #f #t)
- (token-struct 'IDENTIFIER 'BLANK_LINE #f #f #f #f #f)
- "*"
+ (token-struct 'IDENTIFIER 'ProdOrQuot #f #f #f #f #f)
+ (token-struct 'WS_LEFT "\r\n             " #f #f #f #f #t)
+ "|"
+ (token-struct 'WS_LEFT "   " #f #f #f #f #t)
+ (token-struct 'IDENTIFIER 'atom #f #f #f #f #f)
+ ":"
+ (token-struct 'IDENTIFIER 'Atom #f #f #f #f #f)
  (token-struct 'BLANK_LINE "\r\n\r\n" #f #f #f #f #f)
- (token-struct 'IDENTIFIER 'Rule #f #f #f #f #f)
+ (token-struct 'IDENTIFIER 'Atom #f #f #f #f #f)
  (token-struct 'WS_LEFT "  " #f #f #f #f #t)
  "::="
  (token-struct 'WS_LEFT "  " #f #f #f #f #t)
- (token-struct 'IDENTIFIER 'ignore #f #f #f #f #f)
- ":"
- (token-struct 'STRING "ignore" #f #f #f #f #f)
- "?"
- (token-struct 'WS_LEFT " " #f #f #f #f #t)
- (token-struct 'IDENTIFIER 'name #f #f #f #f #f)
+ (token-struct 'IDENTIFIER 'identifier #f #f #f #f #f)
  ":"
  (token-struct 'IDENTIFIER 'IDENTIFIER #f #f #f #f #f)
- (token-struct 'WS_LEFT " " #f #f #f #f #t)
- "("
- (token-struct 'STRING "::=" #f #f #f #f #f)
- "|"
- (token-struct 'STRING ":" #f #f #f #f #f)
- ")"
- (token-struct 'WS_LEFT " " #f #f #f #f #t)
- (token-struct 'IDENTIFIER 'pattern #f #f #f #f #f)
- ":"
- (token-struct 'IDENTIFIER 'Pattern #f #f #f #f #f)
- (token-struct 'BLANK_LINE "\r\n\r\n" #f #f #f #f #f)
- (token-struct 'IDENTIFIER 'Pattern #f #f #f #f #f)
- (token-struct 'WS_LEFT "  " #f #f #f #f #t)
- "::="
- (token-struct 'WS_LEFT "  " #f #f #f #f #t)
- (token-struct 'IDENTIFIER 'alternation #f #f #f #f #f)
- ":"
- (token-struct 'IDENTIFIER 'Alternation #f #f #f #f #f)
- (token-struct 'WS_LEFT "      " #f #f #f #f #t)
- (token-struct 'COMMENT " one from multiple options\r" #f #f #f #f #t)
- (token-struct 'WS_LEFT "\n          " #f #f #f #f #t)
+ (token-struct 'WS_LEFT "\r\n       " #f #f #f #f #t)
  "|"
  (token-struct 'WS_LEFT "   " #f #f #f #f #t)
- (token-struct 'IDENTIFIER 'concatenation #f #f #f #f #f)
+ (token-struct 'IDENTIFIER 'number #f #f #f #f #f)
  ":"
- (token-struct 'IDENTIFIER 'Concatenation #f #f #f #f #f)
- (token-struct 'WS_LEFT "  " #f #f #f #f #t)
- (token-struct 'COMMENT " one or more subpatterns\r" #f #f #f #f #t)
- (token-struct 'BLANK_LINE "\n\r\n" #f #f #f #f #f)
- (token-struct 'IDENTIFIER 'Alternation #f #f #f #f #f)
- (token-struct 'WS_LEFT "  " #f #f #f #f #t)
- "::="
- (token-struct 'WS_LEFT "  " #f #f #f #f #t)
- (token-struct 'IDENTIFIER 'patterns #f #f #f #f #f)
- ":"
- (token-struct 'IDENTIFIER 'PatternTerm #f #f #f #f #f)
- (token-struct 'WS_LEFT " " #f #f #f #f #t)
- "("
- (token-struct 'STRING "|" #f #f #f #f #f)
- (token-struct 'WS_LEFT " " #f #f #f #f #t)
- (token-struct 'IDENTIFIER 'patterns #f #f #f #f #f)
- ":"
- (token-struct 'IDENTIFIER 'PatternTerm #f #f #f #f #f)
- ")"
- "+"
- (token-struct 'BLANK_LINE "\r\n\r\n" #f #f #f #f #f)
- (token-struct 'IDENTIFIER 'Concatenation #f #f #f #f #f)
- (token-struct 'WS_LEFT "  " #f #f #f #f #t)
- "::="
- (token-struct 'WS_LEFT "  " #f #f #f #f #t)
- (token-struct 'IDENTIFIER 'patterns #f #f #f #f #f)
- ":"
- (token-struct 'IDENTIFIER 'PatternTerm #f #f #f #f #f)
- "+"
- (token-struct 'BLANK_LINE "\r\n\r\n" #f #f #f #f #f)
- (token-struct 'IDENTIFIER 'PatternTerm #f #f #f #f #f)
- (token-struct 'WS_LEFT "  " #f #f #f #f #t)
- "::="
- (token-struct 'WS_LEFT "  " #f #f #f #f #t)
- (token-struct 'IDENTIFIER 'bound #f #f #f #f #f)
- ":"
- (token-struct 'IDENTIFIER 'BoundPatternTerm #f #f #f #f #f)
- (token-struct 'WS_LEFT "\r\n              " #f #f #f #f #t)
- "|"
- (token-struct 'WS_LEFT "   " #f #f #f #f #t)
- (token-struct 'IDENTIFIER 'unbound #f #f #f #f #f)
- ":"
- (token-struct 'IDENTIFIER 'QuantifiedPatternTerm #f #f #f #f #f)
- (token-struct 'BLANK_LINE "\r\n\r\n" #f #f #f #f #f)
- (token-struct 'IDENTIFIER 'BoundPatternTerm #f #f #f #f #f)
- (token-struct 'WS_LEFT "  " #f #f #f #f #t)
- "::="
- (token-struct 'WS_LEFT "  " #f #f #f #f #t)
- (token-struct 'IDENTIFIER 'name #f #f #f #f #f)
- ":"
- (token-struct 'IDENTIFIER 'IDENTIFIER #f #f #f #f #f)
- (token-struct 'WS_LEFT " " #f #f #f #f #t)
- (token-struct 'STRING ":" #f #f #f #f #f)
- (token-struct 'WS_LEFT " " #f #f #f #f #t)
- (token-struct 'IDENTIFIER 'term #f #f #f #f #f)
- ":"
- (token-struct 'IDENTIFIER 'QuantifiedPatternTerm #f #f #f #f #f)
- (token-struct 'BLANK_LINE "\r\n\r\n" #f #f #f #f #f)
- (token-struct 'IDENTIFIER 'QuantifiedPatternTerm #f #f #f #f #f)
- (token-struct 'WS_LEFT "  " #f #f #f #f #t)
- "::="
- (token-struct 'WS_LEFT "  " #f #f #f #f #t)
- (token-struct 'IDENTIFIER 'star #f #f #f #f #f)
- ":"
- (token-struct 'IDENTIFIER 'UnquantifiedPatternTerm #f #f #f #f #f)
- (token-struct 'WS_LEFT " " #f #f #f #f #t)
- (token-struct 'STRING "*" #f #f #f #f #f)
- (token-struct 'WS_LEFT "\r\n                        " #f #f #f #f #t)
- "|"
- (token-struct 'WS_LEFT "   " #f #f #f #f #t)
- (token-struct 'IDENTIFIER 'plus #f #f #f #f #f)
- ":"
- (token-struct 'IDENTIFIER 'UnquantifiedPatternTerm #f #f #f #f #f)
- (token-struct 'WS_LEFT " " #f #f #f #f #t)
- (token-struct 'STRING "+" #f #f #f #f #f)
- (token-struct 'WS_LEFT "\r\n                        " #f #f #f #f #t)
- "|"
- (token-struct 'WS_LEFT "   " #f #f #f #f #t)
- (token-struct 'IDENTIFIER 'question #f #f #f #f #f)
- ":"
- (token-struct 'IDENTIFIER 'UnquantifiedPatternTerm #f #f #f #f #f)
- (token-struct 'WS_LEFT " " #f #f #f #f #t)
- (token-struct 'STRING "?" #f #f #f #f #f)
- (token-struct 'WS_LEFT "\r\n                        " #f #f #f #f #t)
- "|"
- (token-struct 'WS_LEFT "   " #f #f #f #f #t)
- (token-struct 'IDENTIFIER 'term #f #f #f #f #f)
- ":"
- (token-struct 'IDENTIFIER 'UnquantifiedPatternTerm #f #f #f #f #f)
- (token-struct 'BLANK_LINE "\r\n\r\n" #f #f #f #f #f)
- (token-struct 'IDENTIFIER 'UnquantifiedPatternTerm #f #f #f #f #f)
- (token-struct 'WS_LEFT "  " #f #f #f #f #t)
- "::="
- (token-struct 'WS_LEFT "  " #f #f #f #f #t)
- (token-struct 'IDENTIFIER 'literal #f #f #f #f #f)
- ":"
- (token-struct 'IDENTIFIER 'STRING #f #f #f #f #f)
- (token-struct 'WS_LEFT "\r\n                          " #f #f #f #f #t)
- "|"
- (token-struct 'WS_LEFT "   " #f #f #f #f #t)
- (token-struct 'IDENTIFIER 'regex #f #f #f #f #f)
- ":"
- (token-struct 'IDENTIFIER 'REGEX #f #f #f #f #f)
- (token-struct 'WS_LEFT "\r\n                          " #f #f #f #f #t)
- "|"
- (token-struct 'WS_LEFT "   " #f #f #f #f #t)
- (token-struct 'IDENTIFIER 'rule #f #f #f #f #f)
- ":"
- (token-struct 'IDENTIFIER 'IDENTIFIER #f #f #f #f #f)
- (token-struct 'WS_LEFT "\r\n                          " #f #f #f #f #t)
- "|"
- (token-struct 'WS_LEFT "   " #f #f #f #f #t)
- (token-struct 'IDENTIFIER 'empty #f #f #f #f #f)
- ":"
- (token-struct 'IDENTIFIER 'EMPTY #f #f #f #f #f)
- (token-struct 'WS_LEFT "\r\n                          " #f #f #f #f #t)
+ (token-struct 'IDENTIFIER 'NUMBER #f #f #f #f #f)
+ (token-struct 'WS_LEFT "\r\n       " #f #f #f #f #t)
  "|"
  (token-struct 'WS_LEFT "   " #f #f #f #f #t)
  (token-struct 'STRING "(" #f #f #f #f #f)
  (token-struct 'WS_LEFT " " #f #f #f #f #t)
- (token-struct 'IDENTIFIER 'pattern #f #f #f #f #f)
+ (token-struct 'IDENTIFIER 'expression #f #f #f #f #f)
  ":"
- (token-struct 'IDENTIFIER 'Pattern #f #f #f #f #f)
+ (token-struct 'IDENTIFIER 'Expression #f #f #f #f #f)
  (token-struct 'WS_LEFT " " #f #f #f #f #t)
  (token-struct 'STRING ")" #f #f #f #f #f)
+ (token-struct 'BLANK_LINE "\r\n\r\n" #f #f #f #f #f)
+ (token-struct 'IDENTIFIER 'SumOrDiff #f #f #f #f #f)
+ (token-struct 'WS_LEFT "  " #f #f #f #f #t)
+ "::="
+ (token-struct 'WS_LEFT "  " #f #f #f #f #t)
+ (token-struct 'IDENTIFIER 'left #f #f #f #f #f)
+ ":"
+ (token-struct 'IDENTIFIER 'SumOrDiffTerm #f #f #f #f #f)
+ (token-struct 'WS_LEFT " " #f #f #f #f #t)
+ "("
+ (token-struct 'IDENTIFIER 'op #f #f #f #f #f)
+ ":"
+ (token-struct 'IDENTIFIER 'PlusOrMinus #f #f #f #f #f)
+ (token-struct 'WS_LEFT " " #f #f #f #f #t)
+ (token-struct 'IDENTIFIER 'right #f #f #f #f #f)
+ ":"
+ (token-struct 'IDENTIFIER 'SumOrDiffTerm #f #f #f #f #f)
+ ")"
+ "+"
+ (token-struct 'BLANK_LINE "\r\n\r\n" #f #f #f #f #f)
+ (token-struct 'IDENTIFIER 'SumOrDiffTerm #f #f #f #f #f)
+ (token-struct 'WS_LEFT "  " #f #f #f #f #t)
+ "::="
+ (token-struct 'WS_LEFT "  " #f #f #f #f #t)
+ (token-struct 'IDENTIFIER 'prodOrQuot #f #f #f #f #f)
+ ":"
+ (token-struct 'IDENTIFIER 'ProdOrQuot #f #f #f #f #f)
+ (token-struct 'WS_LEFT "\r\n                " #f #f #f #f #t)
+ "|"
+ (token-struct 'WS_LEFT "   " #f #f #f #f #t)
+ (token-struct 'IDENTIFIER 'atom #f #f #f #f #f)
+ ":"
+ (token-struct 'IDENTIFIER 'Atom #f #f #f #f #f)
+ (token-struct 'BLANK_LINE "\r\n\r\n" #f #f #f #f #f)
+ (token-struct 'IDENTIFIER 'ProdOrQuot #f #f #f #f #f)
+ (token-struct 'WS_LEFT "  " #f #f #f #f #t)
+ "::="
+ (token-struct 'WS_LEFT "  " #f #f #f #f #t)
+ (token-struct 'IDENTIFIER 'left #f #f #f #f #f)
+ ":"
+ (token-struct 'IDENTIFIER 'Atom #f #f #f #f #f)
+ (token-struct 'WS_LEFT " " #f #f #f #f #t)
+ "("
+ (token-struct 'IDENTIFIER 'op #f #f #f #f #f)
+ ":"
+ (token-struct 'IDENTIFIER 'TimesOrDividedBy #f #f #f #f #f)
+ (token-struct 'WS_LEFT " " #f #f #f #f #t)
+ (token-struct 'IDENTIFIER 'right #f #f #f #f #f)
+ ":"
+ (token-struct 'IDENTIFIER 'Atom #f #f #f #f #f)
+ ")"
+ "+"
+ (token-struct 'BLANK_LINE "\r\n\r\n" #f #f #f #f #f)
+ (token-struct 'IDENTIFIER 'enumeration #f #f #f #f #f)
+ (token-struct 'WS_LEFT " " #f #f #f #f #t)
+ (token-struct 'IDENTIFIER 'PlusOrMinus #f #f #f #f #f)
+ (token-struct 'WS_LEFT "  " #f #f #f #f #t)
+ "::="
+ (token-struct 'WS_LEFT "  " #f #f #f #f #t)
+ (token-struct 'STRING "+" #f #f #f #f #f)
+ (token-struct 'WS_LEFT " " #f #f #f #f #t)
+ "|"
+ (token-struct 'WS_LEFT " " #f #f #f #f #t)
+ (token-struct 'STRING "-" #f #f #f #f #f)
+ (token-struct 'BLANK_LINE "\r\n\r\n" #f #f #f #f #f)
+ (token-struct 'IDENTIFIER 'enumeration #f #f #f #f #f)
+ (token-struct 'WS_LEFT " " #f #f #f #f #t)
+ (token-struct 'IDENTIFIER 'TimesOrDividedBy #f #f #f #f #f)
+ (token-struct 'WS_LEFT "  " #f #f #f #f #t)
+ "::="
+ (token-struct 'WS_LEFT "  " #f #f #f #f #t)
+ (token-struct 'STRING "*" #f #f #f #f #f)
+ (token-struct 'WS_LEFT " " #f #f #f #f #t)
+ "|"
+ (token-struct 'WS_LEFT " " #f #f #f #f #t)
+ (token-struct 'STRING "/" #f #f #f #f #f)
+ (token-struct 'BLANK_LINE "\r\n\r\n" #f #f #f #f #f)
+ (token-struct 'IDENTIFIER 'decimal #f #f #f #f #f)
+ (token-struct 'WS_LEFT " " #f #f #f #f #t)
+ (token-struct 'IDENTIFIER 'NUMBER #f #f #f #f #f)
+ (token-struct 'WS_LEFT "  " #f #f #f #f #t)
+ "::="
+ (token-struct 'WS_LEFT "  " #f #f #f #f #t)
+ (token-struct 'REGEX '(regex "(0|[1-9][0-9]*)(\\.[0-9]+)?") #f #f #f #f #f)
  (token-struct 'BLANK_LINE "\r\n\r\n" #f #f #f #f #f)
  (token-struct 'IDENTIFIER 'IDENTIFIER #f #f #f #f #f)
  (token-struct 'WS_LEFT "  " #f #f #f #f #t)
  "::="
  (token-struct 'WS_LEFT "  " #f #f #f #f #t)
- (token-struct 'REGEX '(regex "[a-zA-Z_][0-9a-zA-Z_]*") #f #f #f #f #f)
- (token-struct 'BLANK_LINE "\r\n\r\n" #f #f #f #f #f)
- (token-struct 'IDENTIFIER 'STRING #f #f #f #f #f)
- (token-struct 'WS_LEFT "  " #f #f #f #f #t)
- "::="
- (token-struct 'WS_LEFT "  " #f #f #f #f #t)
- (token-struct 'REGEX '(regex "\"([^\\\\\"]|\\\\.)*\"") #f #f #f #f #f)
- (token-struct 'BLANK_LINE "\r\n\r\n" #f #f #f #f #f)
- (token-struct 'IDENTIFIER 'REGEX #f #f #f #f #f)
- (token-struct 'WS_LEFT "  " #f #f #f #f #t)
- "::="
- (token-struct 'WS_LEFT "  " #f #f #f #f #t)
- (token-struct 'REGEX '(regex "/([^\\\\/]|\\\\.)*/") #f #f #f #f #f)
- (token-struct 'BLANK_LINE "\r\n\r\n" #f #f #f #f #f)
- (token-struct 'IDENTIFIER 'EMPTY #f #f #f #f #f)
- (token-struct 'WS_LEFT "  " #f #f #f #f #t)
- "::="
- (token-struct 'WS_LEFT "  " #f #f #f #f #t)
- (token-struct 'REGEX '(regex "\\(\\)") #f #f #f #f #f)
- (token-struct 'BLANK_LINE "\r\n\r\n" #f #f #f #f #f)
- (token-struct 'IDENTIFIER 'ignore #f #f #f #f #f)
- (token-struct 'WS_LEFT " " #f #f #f #f #t)
- (token-struct 'IDENTIFIER 'COMMENT #f #f #f #f #f)
- (token-struct 'WS_LEFT "  " #f #f #f #f #t)
- "::="
- (token-struct 'WS_LEFT "  " #f #f #f #f #t)
- (token-struct 'REGEX '(regex "\\(\\*([^*]|\\*[^)])*\\*\\)") #f #f #f #f #f)
- (token-struct 'BLANK_LINE "\r\n\r\n" #f #f #f #f #f)
- (token-struct 'IDENTIFIER 'BLANK_LINE #f #f #f #f #f)
- (token-struct 'WS_LEFT "  " #f #f #f #f #t)
- "::="
- (token-struct 'WS_LEFT "  " #f #f #f #f #t)
- (token-struct 'REGEX '(regex "\\s*\\n\\s*\\n\\s*") #f #f #f #f #f)
- (token-struct 'BLANK_LINE "\r\n\r\n" #f #f #f #f #f)
- (token-struct 'IDENTIFIER 'ignore #f #f #f #f #f)
- (token-struct 'WS_LEFT " " #f #f #f #f #t)
- (token-struct 'IDENTIFIER 'WS_LEFT #f #f #f #f #f)
- (token-struct 'WS_LEFT "  " #f #f #f #f #t)
- "::="
- (token-struct 'WS_LEFT "  " #f #f #f #f #t)
- (token-struct 'REGEX '(regex "\\s+(?=\\S)") #f #f #f #f #f)
- (token-struct 'BLANK_LINE "\r\n\r\n" #f #f #f #f #f)
- (token-struct 'IDENTIFIER 'ignore #f #f #f #f #f)
- (token-struct 'WS_LEFT " " #f #f #f #f #t)
- (token-struct 'IDENTIFIER 'WS_END #f #f #f #f #f)
- (token-struct 'WS_LEFT "  " #f #f #f #f #t)
- "::="
- (token-struct 'WS_LEFT "  " #f #f #f #f #t)
- (token-struct 'REGEX '(regex "\\s+$") #f #f #f #f #f))
+ (token-struct
+  'REGEX
+  '(regex "[^0-9][a-zA-Z0-9_\\-!@#$%^&*+=:/?~]*")
+  #f
+  #f
+  #f
+  #f
+  #f))

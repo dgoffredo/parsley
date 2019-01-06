@@ -18,23 +18,14 @@ struct Subpattern {
 };
 
 const Subpattern k_SUBPATTERNS[] = {
-    {"TOKEN_9", "TOKEN_9_VALUE", "\\)", LexerToken::e_TOKEN_9},
-    {"TOKEN_8", "TOKEN_8_VALUE", "\\(", LexerToken::e_TOKEN_8},
-    {"TOKEN_7", "TOKEN_7_VALUE", "\\?", LexerToken::e_TOKEN_7},
-    {"TOKEN_6", "TOKEN_6_VALUE", "\\+", LexerToken::e_TOKEN_6},
+    {"TOKEN_6", "TOKEN_6_VALUE", "/", LexerToken::e_TOKEN_6},
     {"TOKEN_5", "TOKEN_5_VALUE", "\\*", LexerToken::e_TOKEN_5},
-    {"TOKEN_4", "TOKEN_4_VALUE", "\\|", LexerToken::e_TOKEN_4},
-    {"TOKEN_3", "TOKEN_3_VALUE", ":", LexerToken::e_TOKEN_3},
-    {"TOKEN_2", "TOKEN_2_VALUE", "::=", LexerToken::e_TOKEN_2},
-    {"TOKEN_1", "TOKEN_1_VALUE", "ignore", LexerToken::e_TOKEN_1},
-    {"IDENTIFIER", "IDENTIFIER_VALUE", "[a-zA-Z_][0-9a-zA-Z_]*", LexerToken::e_IDENTIFIER},
-    {"STRING", "STRING_VALUE", "\"([^\\\\\"]|\\\\.)*\"", LexerToken::e_STRING},
-    {"REGEX", "REGEX_VALUE", "/([^\\\\/]|\\\\.)*/", LexerToken::e_REGEX},
-    {"EMPTY", "EMPTY_VALUE", "\\(\\)", LexerToken::e_EMPTY},
-    {"COMMENT", "COMMENT_VALUE", "\\(\\*([^*]|\\*[^)])*\\*\\)", LexerToken::e_COMMENT},
-    {"BLANK_LINE", "BLANK_LINE_VALUE", "\\s*\\n\\s*\\n\\s*", LexerToken::e_BLANK_LINE},
-    {"WS_LEFT", "WS_LEFT_VALUE", "\\s+(?=\\S)", LexerToken::e_WS_LEFT},
-    {"WS_END", "WS_END_VALUE", "\\s+$", LexerToken::e_WS_END}
+    {"TOKEN_4", "TOKEN_4_VALUE", "\\-", LexerToken::e_TOKEN_4},
+    {"TOKEN_3", "TOKEN_3_VALUE", "\\+", LexerToken::e_TOKEN_3},
+    {"TOKEN_2", "TOKEN_2_VALUE", "\\)", LexerToken::e_TOKEN_2},
+    {"TOKEN_1", "TOKEN_1_VALUE", "\\(", LexerToken::e_TOKEN_1},
+    {"NUMBER", "NUMBER_VALUE", "(0|[1-9][0-9]*)(\\.[0-9]+)?", LexerToken::e_NUMBER},
+    {"IDENTIFIER", "IDENTIFIER_VALUE", "[^0-9][a-zA-Z0-9_\\-!@#$%^&*+=:/?~]*", LexerToken::e_IDENTIFIER}
 };
 
 const Subpattern *const k_END = bdlb::ArrayUtil::end(k_SUBPATTERNS);

@@ -1,67 +1,50 @@
 #ifndef INCLUDED_SNAZZY_PARSEUTIL
 #define INCLUDED_SNAZZY_PARSEUTIL
 
+#include <snazzy_messages.h>
+
 #include <bsl_iosfwd.h>
 #include <bsl_string.h>
 
 namespace BloombergLP {
 namespace snazzy {
-class Alternation;
-class BoundPatternTerm;
-class Concatenation;
-class Grammar;
 class Lexer;
-class Pattern;
-class PatternTerm;
-class QuantifiedPatternTerm;
-class Rule;
-class UnquantifiedPatternTerm;
 
 struct ParseUtil {
     // This 'struct' provides a namespace of functions used to parse instances
     // of generated types from text.
 
-    static int parse(Grammar                 *output,
+    static int parse(Expression      *output,
                      const bslstl::StringRef&  input,
                      bsl::ostream&                  errorStream,
                      Lexer                  *lexer = 0);
 
-    static int parse(Rule                 *output,
+    static int parse(Atom      *output,
                      const bslstl::StringRef&  input,
                      bsl::ostream&                  errorStream,
                      Lexer                  *lexer = 0);
 
-    static int parse(Pattern                 *output,
+    static int parse(SumOrDiff      *output,
                      const bslstl::StringRef&  input,
                      bsl::ostream&                  errorStream,
                      Lexer                  *lexer = 0);
 
-    static int parse(Alternation                 *output,
+    static int parse(SumOrDiffTerm      *output,
                      const bslstl::StringRef&  input,
                      bsl::ostream&                  errorStream,
                      Lexer                  *lexer = 0);
 
-    static int parse(Concatenation                 *output,
+    static int parse(ProdOrQuot      *output,
                      const bslstl::StringRef&  input,
                      bsl::ostream&                  errorStream,
                      Lexer                  *lexer = 0);
 
-    static int parse(PatternTerm                 *output,
+    static int parse(PlusOrMinus::Value      *output,
                      const bslstl::StringRef&  input,
                      bsl::ostream&                  errorStream,
                      Lexer                  *lexer = 0);
 
-    static int parse(BoundPatternTerm                 *output,
-                     const bslstl::StringRef&  input,
-                     bsl::ostream&                  errorStream,
-                     Lexer                  *lexer = 0);
-
-    static int parse(QuantifiedPatternTerm                 *output,
-                     const bslstl::StringRef&  input,
-                     bsl::ostream&                  errorStream,
-                     Lexer                  *lexer = 0);
-
-    static int parse(UnquantifiedPatternTerm                 *output,
+    static int parse(TimesOrDividedBy::Value      *output,
                      const bslstl::StringRef&  input,
                      bsl::ostream&                  errorStream,
                      Lexer                  *lexer = 0);

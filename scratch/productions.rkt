@@ -1,133 +1,98 @@
 (productions
  (list
-  (schema/sequence
-   'Grammar
-   (rule/class
-    'Grammar
-    '(Concatenation
-      (Bound rules Rule)
-      (Star
-       (Concatenation
-        (Concatenation BLANK_LINE (Star BLANK_LINE))
-        (Bound rules Rule)))
-      (Star BLANK_LINE))
-    '((rules (0)) (rules (1 0 1))))
-   (list (list 'rules (array (complex 'Rule)))))
-  (schema/sequence
-   'Rule
-   (rule/class
-    'Rule
-    '(Concatenation
-      (Alternation (Bound ignore TOKEN_1) ())
-      (Bound name IDENTIFIER)
-      (Alternation TOKEN_2 TOKEN_3)
-      (Bound pattern Pattern))
-    '((ignore (0 0)) (name (1)) (pattern (3))))
-   (list
-    (list 'ignore (nullable (basic 'string)))
-    (list 'name (scalar (basic 'string)))
-    (list 'pattern (scalar (complex 'Pattern)))))
   (schema/choice
-   'Pattern
+   'Expression
    (rule/class
-    'Pattern
+    'Expression
     '(Alternation
-      (Bound alternation Alternation)
-      (Bound concatenation Concatenation))
-    '((alternation (0)) (concatenation (1))))
+      (Bound sumOrDiff SumOrDiff)
+      (Bound prodOrQuot ProdOrQuot)
+      (Bound atom Atom))
+    '((sumOrDiff (0)) (prodOrQuot (1)) (atom (2))))
    (list
-    (list 'concatenation (scalar (complex 'Concatenation)))
-    (list 'alternation (scalar (complex 'Alternation)))))
-  (schema/sequence
-   'Alternation
+    (list 'sumOrDiff (scalar (complex 'SumOrDiff)))
+    (list 'atom (scalar (complex 'Atom)))
+    (list 'prodOrQuot (scalar (complex 'ProdOrQuot)))))
+  (schema/choice
+   'Atom
    (rule/class
-    'Alternation
+    'Atom
+    '(Alternation
+      (Bound identifier IDENTIFIER)
+      (Bound number NUMBER)
+      (Concatenation TOKEN_1 (Bound expression Expression) TOKEN_2))
+    '((identifier (0)) (number (1)) (expression (2 1))))
+   (list
+    (list 'expression (scalar (complex 'Expression)))
+    (list 'identifier (scalar (basic 'string)))
+    (list 'number (scalar (basic 'decimal)))))
+  (schema/sequence
+   'SumOrDiff
+   (rule/class
+    'SumOrDiff
     '(Concatenation
-      (Bound patterns PatternTerm)
+      (Bound left SumOrDiffTerm)
       (Concatenation
-       (Concatenation TOKEN_4 (Bound patterns PatternTerm))
-       (Star (Concatenation TOKEN_4 (Bound patterns PatternTerm)))))
-    '((patterns (0)) (patterns (1 0 1)) (patterns (1 1 0 1))))
-   (list (list 'patterns (array (complex 'PatternTerm)))))
+       (Concatenation (Bound op PlusOrMinus) (Bound right SumOrDiffTerm))
+       (Star
+        (Concatenation (Bound op PlusOrMinus) (Bound right SumOrDiffTerm)))))
+    '((left (0))
+      (op (1 0 0))
+      (right (1 0 1))
+      (op (1 1 0 0))
+      (right (1 1 0 1))))
+   (list
+    (list 'left (scalar (complex 'SumOrDiffTerm)))
+    (list 'op (array (complex 'PlusOrMinus)))
+    (list 'right (array (complex 'SumOrDiffTerm)))))
+  (schema/choice
+   'SumOrDiffTerm
+   (rule/class
+    'SumOrDiffTerm
+    '(Alternation (Bound prodOrQuot ProdOrQuot) (Bound atom Atom))
+    '((prodOrQuot (0)) (atom (1))))
+   (list
+    (list 'atom (scalar (complex 'Atom)))
+    (list 'prodOrQuot (scalar (complex 'ProdOrQuot)))))
   (schema/sequence
-   'Concatenation
+   'ProdOrQuot
    (rule/class
-    'Concatenation
+    'ProdOrQuot
     '(Concatenation
-      (Bound patterns PatternTerm)
-      (Star (Bound patterns PatternTerm)))
-    '((patterns (0)) (patterns (1 0))))
-   (list (list 'patterns (array (complex 'PatternTerm)))))
-  (schema/choice
-   'PatternTerm
-   (rule/class
-    'PatternTerm
-    '(Alternation
-      (Bound bound BoundPatternTerm)
-      (Bound unbound QuantifiedPatternTerm))
-    '((bound (0)) (unbound (1))))
+      (Bound left Atom)
+      (Concatenation
+       (Concatenation (Bound op TimesOrDividedBy) (Bound right Atom))
+       (Star (Concatenation (Bound op TimesOrDividedBy) (Bound right Atom)))))
+    '((left (0))
+      (op (1 0 0))
+      (right (1 0 1))
+      (op (1 1 0 0))
+      (right (1 1 0 1))))
    (list
-    (list 'unbound (scalar (complex 'QuantifiedPatternTerm)))
-    (list 'bound (scalar (complex 'BoundPatternTerm)))))
-  (schema/sequence
-   'BoundPatternTerm
-   (rule/class
-    'BoundPatternTerm
-    '(Concatenation
-      (Bound name IDENTIFIER)
-      TOKEN_3
-      (Bound term QuantifiedPatternTerm))
-    '((name (0)) (term (2))))
-   (list
-    (list 'name (scalar (basic 'string)))
-    (list 'term (scalar (complex 'QuantifiedPatternTerm)))))
-  (schema/choice
-   'QuantifiedPatternTerm
-   (rule/class
-    'QuantifiedPatternTerm
-    '(Alternation
-      (Concatenation (Bound star UnquantifiedPatternTerm) TOKEN_5)
-      (Concatenation (Bound plus UnquantifiedPatternTerm) TOKEN_6)
-      (Concatenation (Bound question UnquantifiedPatternTerm) TOKEN_7)
-      (Bound term UnquantifiedPatternTerm))
-    '((star (0 0)) (plus (1 0)) (question (2 0)) (term (3))))
-   (list
-    (list 'star (scalar (complex 'UnquantifiedPatternTerm)))
-    (list 'plus (scalar (complex 'UnquantifiedPatternTerm)))
-    (list 'question (scalar (complex 'UnquantifiedPatternTerm)))
-    (list 'term (scalar (complex 'UnquantifiedPatternTerm)))))
-  (schema/choice
-   'UnquantifiedPatternTerm
-   (rule/class
-    'UnquantifiedPatternTerm
-    '(Alternation
-      (Bound literal STRING)
-      (Bound regex REGEX)
-      (Bound rule IDENTIFIER)
-      (Bound empty EMPTY)
-      (Concatenation TOKEN_8 (Bound pattern Pattern) TOKEN_9))
-    '((literal (0)) (regex (1)) (rule (2)) (empty (3)) (pattern (4 1))))
-   (list
-    (list 'empty (scalar (basic 'string)))
-    (list 'literal (scalar (basic 'string)))
-    (list 'pattern (scalar (complex 'Pattern)))
-    (list 'rule (scalar (basic 'string)))
-    (list 'regex (scalar (basic 'string))))))
+    (list 'left (scalar (complex 'Atom)))
+    (list 'op (array (complex 'TimesOrDividedBy)))
+    (list 'right (array (complex 'Atom)))))
+  (schema/enumeration
+   'PlusOrMinus
+   (rule/enumeration 'PlusOrMinus '(Alternation TOKEN_3 TOKEN_4) '("+" "-"))
+   '("+" "-"))
+  (schema/enumeration
+   'TimesOrDividedBy
+   (rule/enumeration
+    'TimesOrDividedBy
+    '(Alternation TOKEN_5 TOKEN_6)
+    '("*" "/"))
+   '("*" "/")))
  (list
-  (token 'TOKEN_9 "\\)" (basic 'string) #f)
-  (token 'TOKEN_8 "\\(" (basic 'string) #f)
-  (token 'TOKEN_7 "\\?" (basic 'string) #f)
-  (token 'TOKEN_6 "\\+" (basic 'string) #f)
+  (token 'TOKEN_6 "/" (basic 'string) #f)
   (token 'TOKEN_5 "\\*" (basic 'string) #f)
-  (token 'TOKEN_4 "\\|" (basic 'string) #f)
-  (token 'TOKEN_3 ":" (basic 'string) #f)
-  (token 'TOKEN_2 "::=" (basic 'string) #f)
-  (token 'TOKEN_1 "ignore" (basic 'string) #f)
-  (token 'IDENTIFIER "[a-zA-Z_][0-9a-zA-Z_]*" (basic 'string) #f)
-  (token 'STRING "\"([^\\\\\"]|\\\\.)*\"" (basic 'string) #f)
-  (token 'REGEX "/([^\\\\/]|\\\\.)*/" (basic 'string) #f)
-  (token 'EMPTY "\\(\\)" (basic 'string) #f)
-  (token 'COMMENT "\\(\\*([^*]|\\*[^)])*\\*\\)" (basic 'string) #t)
-  (token 'BLANK_LINE "\\s*\\n\\s*\\n\\s*" (basic 'string) #f)
-  (token 'WS_LEFT "\\s+(?=\\S)" (basic 'string) #t)
-  (token 'WS_END "\\s+$" (basic 'string) #t)))
+  (token 'TOKEN_4 "\\-" (basic 'string) #f)
+  (token 'TOKEN_3 "\\+" (basic 'string) #f)
+  (token 'TOKEN_2 "\\)" (basic 'string) #f)
+  (token 'TOKEN_1 "\\(" (basic 'string) #f)
+  (token 'NUMBER "(0|[1-9][0-9]*)(\\.[0-9]+)?" (basic 'decimal) #f)
+  (token
+   'IDENTIFIER
+   "[^0-9][a-zA-Z0-9_\\-!@#$%^&*+=:/?~]*"
+   (basic 'string)
+   #f)))

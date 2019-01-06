@@ -3,7 +3,7 @@
 #include <snazzy_messages.h>
 
 #include <bdlb_literalutil.h>
-
+#include <bdlb_numericparseutil.h>
 #include <bsls_assert.h>
 #include <bsls_nameof.h>
 
@@ -14,48 +14,30 @@
 //
 // This component parses the productions from the following Parsley grammar:
 /*
-Grammar  ::=  rules:Rule (BLANK_LINE+ rules:Rule)* BLANK_LINE*
+# e.g. 3*(2 + 4 / 2 + 6) - 1
+# ... which is 29
+Expression  ::=  sumOrDiff:SumOrDiff
+             |   prodOrQuot:ProdOrQuot
+             |   atom:Atom
 
-Rule  ::=  ignore:"ignore"? name:IDENTIFIER ("::="|":") pattern:Pattern
+Atom  ::=  identifier:IDENTIFIER
+       |   number:NUMBER
+       |   "(" expression:Expression ")"
 
-Pattern  ::=  alternation:Alternation      # one from multiple options
-          |   concatenation:Concatenation  # one or more subpatterns
+SumOrDiff  ::=  left:SumOrDiffTerm (op:PlusOrMinus right:SumOrDiffTerm)+
 
-Alternation  ::=  patterns:PatternTerm ("|" patterns:PatternTerm)+
+SumOrDiffTerm  ::=  prodOrQuot:ProdOrQuot
+                |   atom:Atom
 
-Concatenation  ::=  patterns:PatternTerm+
+ProdOrQuot  ::=  left:Atom (op:TimesOrDividedBy right:Atom)+
 
-PatternTerm  ::=  bound:BoundPatternTerm
-              |   unbound:QuantifiedPatternTerm
+enumeration PlusOrMinus  ::=  "+" | "-"
 
-BoundPatternTerm  ::=  name:IDENTIFIER ":" term:QuantifiedPatternTerm
+enumeration TimesOrDividedBy  ::=  "*" | "/"
 
-QuantifiedPatternTerm  ::=  star:UnquantifiedPatternTerm "*"
-                        |   plus:UnquantifiedPatternTerm "+"
-                        |   question:UnquantifiedPatternTerm "?"
-                        |   term:UnquantifiedPatternTerm
+decimal NUMBER  ::=  /(0|[1-9][0-9]*)(\.[0-9]+)?/
 
-UnquantifiedPatternTerm  ::=  literal:STRING
-                          |   regex:REGEX
-                          |   rule:IDENTIFIER
-                          |   empty:EMPTY
-                          |   "(" pattern:Pattern ")"
-
-IDENTIFIER  ::=  /[a-zA-Z_][0-9a-zA-Z_]*\/
-
-STRING  ::=  /"([^\\"]|\\.)*"/
-
-REGEX  ::=  /\/([^\\\/]|\\.)*\//
-
-EMPTY  ::=  /\(\)/
-
-ignore COMMENT  ::=  /\(\*([^*]|\*[^)])*\*\)/
-
-BLANK_LINE  ::=  /\s*\n\s*\n\s*\/
-
-ignore WS_LEFT  ::=  /\s+(?=\S)/
-
-ignore WS_END  ::=  /\s+$/
+IDENTIFIER  ::=  /[^0-9][a-zA-Z0-9_\-!@#$%^&*+=:\/?~]*\/
 */
 // clang-format on
 
@@ -65,47 +47,37 @@ namespace {
 
 typedef bsl::vector<LexerToken>::const_iterator TokenIter;
 
-int read(Grammar        *output,
+int read(Expression        *output,
          TokenIter    *token,
          TokenIter     endTokens,
          bsl::ostream *errors);
 
-int read(Rule        *output,
+int read(Atom        *output,
          TokenIter    *token,
          TokenIter     endTokens,
          bsl::ostream *errors);
 
-int read(Pattern        *output,
+int read(SumOrDiff        *output,
          TokenIter    *token,
          TokenIter     endTokens,
          bsl::ostream *errors);
 
-int read(Alternation        *output,
+int read(SumOrDiffTerm        *output,
          TokenIter    *token,
          TokenIter     endTokens,
          bsl::ostream *errors);
 
-int read(Concatenation        *output,
+int read(ProdOrQuot        *output,
          TokenIter    *token,
          TokenIter     endTokens,
          bsl::ostream *errors);
 
-int read(PatternTerm        *output,
+int read(PlusOrMinus::Value        *output,
          TokenIter    *token,
          TokenIter     endTokens,
          bsl::ostream *errors);
 
-int read(BoundPatternTerm        *output,
-         TokenIter    *token,
-         TokenIter     endTokens,
-         bsl::ostream *errors);
-
-int read(QuantifiedPatternTerm        *output,
-         TokenIter    *token,
-         TokenIter     endTokens,
-         bsl::ostream *errors);
-
-int read(UnquantifiedPatternTerm        *output,
+int read(TimesOrDividedBy::Value        *output,
          TokenIter    *token,
          TokenIter     endTokens,
          bsl::ostream *errors);
@@ -132,14 +104,27 @@ int read(bsl::string      *output,
     // specified 'errors' is not zero, write a diagnostic to 'errors'
     // describing how reading failed.
 
+int read(double            *output,
+         LexerToken::Kind  tokenKind,
+         TokenIter            *token,
+         TokenIter             endTokens,
+         bsl::ostream         *errors);
+    // If the specified 'token' refers to a token having the specified
+    // 'tokenKind', then increment the token referred to by 'token', and if
+    // additionally 'output' is not zero, convert the matching token into the
+    // appropriate type and load the resulting value into 'output'. Return zero
+    // on success or a nonzero value if: 'token' does not refer to a token of
+    // kind 'tokenKind', 'token' is equal to the specified 'endTokens', or the
+    // token is not convertible to the type of 'output'. On failure, if the
+    // specified 'errors' is not zero, write a diagnostic to 'errors'
+    // describing the failure.
+
 bool ignore(LexerToken::Kind tokenKind)
     // Return whether the specified 'tokenkind' ought to be ignored by the
     // parser.
 {
     switch (tokenKind) {
-      case LexerToken::e_COMMENT: return true;
-      case LexerToken::e_WS_LEFT: return true;
-      case LexerToken::e_WS_END: return true;
+
       default:
         return false;
     }
@@ -203,14 +188,6 @@ Member *getMemberPtr(Member& member)
 }
 
 template <typename Member>
-Member *getMemberPtr(bdlb::NullableValue<Member>& member)
-    // Return a pointer to a default-constructed object within the specified
-    // 'member' of some class parsed by this component.
-{
-    return &member.makeValueInplace();
-}
-
-template <typename Member>
 Member *getMemberPtr(bsl::vector<Member>& member)
     // Return a pointer to a default-constructed object appended to the end of
     // the specified 'member' of some class parsed by this component.
@@ -223,15 +200,6 @@ template <typename Member>
 void resetMember(Member&)
     // Non-nullable, non-array members need no resetting.
 {
-}
-
-template <typename Member>
-void resetMember(bdlb::NullableValue<Member>& member)
-    // Load a null value into the specified nullable 'member' of some class
-    // parsed by this component. This undoes the operation performed by
-    // 'getMemberPtr'.
-{
-    member.reset();
 }
 
 template <typename Member>
@@ -308,6 +276,95 @@ int read(bsl::string          *output,
     *tokenIterPtr = tokenIter;
     return 0;
 }
+template <typename Number, typename NumberParser>
+int readNumeric(Number               *output,
+                LexerToken::Kind  tokenKind,
+                TokenIter            *tokenIterPtr,
+                TokenIter             endTokens,
+                bsl::ostream         *errors
+                NumberParser          parseNumber)
+{
+    BSLS_ASSERT(tokenIterPtr);
+
+    TokenIter         tokenIter(*tokenIterPtr);
+    bsl::string       value;
+    if (const int rc =
+            read(&value, tokenKind, &tokenIter, endTokens, errors)) {
+        if (errors) {
+            const char *const name = bsls::NameOf<Number>::name();
+            *errors << "Unable to read a " << name << " from a token of the "
+                       " kind " << tokenKind << " because reading the token "
+                       "itself failed.\n";
+        }
+        return rc;                                                    // RETURN
+    }
+
+    // If the end had been reached, then 'read' would have failed above.
+    BSLS_ASSERT(*tokenIterPtr != endTokens);
+
+    const LexerToken&  token = **tokenIterPtr;
+    Number                 parsedValue;
+    bslstl::StringRef remainderOrErrorLocation;
+    if (const int rc = parseNumber(&parsedValue,
+                                   &remainderOrErrorLocation,
+                                   token.d_value))
+    {
+        if (errors) {
+            const char *const name = bsls::NameOf<Number>::name();
+            *errors << "Unable to convert " << quoted(token.d_value)
+                    << " to a " << name << ". Error occurred beginning at "
+                    << quoted(remainderOrErrorLocation) << '\n';
+        }
+        return rc;                                                    // RETURN
+    }
+
+    if (!remainderOrErrorLocation.empty()) {
+        if (errors) {
+            const char *const name = bsls::NameOf<Number>::name();
+            *errors << "Parsed a " << name << ' ' << parsedValue << " from "
+                    << quoted(token.d_value)
+                    << " without consuming the entire string. "
+                    << quoted(remainderOrErrorLocation) << " remains.\n";
+        }
+        return 1;                                                     // RETURN
+    }
+
+    if (output) {
+        *output = parsedValue;
+    }
+
+    *tokenIterPtr = tokenIter;
+    return 0;
+}
+
+#define DEFINE_NUMERIC_READ(TYPE, FUNC)                                       \
+    int FUNC(TYPE                          *output,                           \
+             bslstl::StringRef        *remainderOrErrorLocation,         \
+             const bslstl::StringRef&  input)                            \
+    {                                                                         \
+        /* This wrapper function prevents overload ambiguity. */              \
+        return bdlb::NumericParseUtil::FUNC(output,                      \
+                                                 remainderOrErrorLocation,    \
+                                                 input);                      \
+    }                                                                         \
+                                                                              \
+    int read(TYPE                 *output,                                    \
+             LexerToken::Kind  tokenKind,                                 \
+             TokenIter            *tokenIterPtr,                              \
+             TokenIter             endTokens,                                 \
+             bsl::ostream         *errors)                                    \
+    {                                                                         \
+        return readNumeric(output,                                            \
+                           tokenKind,                                         \
+                           tokenIterPtr,                                      \
+                           endTokens,                                         \
+                           errors,                                            \
+                           &FUNC);                                            \
+    }
+
+DEFINE_NUMERIC_READ(double, parseDouble)
+
+#undef DEFINE_NUMERIC_READER
 
 }  // close unnamed namespace
 
@@ -315,7 +372,7 @@ int read(bsl::string          *output,
                             // struct ParseUtil
                             // ----------------
 
-int ParseUtil::parse(Grammar *output,
+int ParseUtil::parse(Expression *output,
                       const bslstl::StringRef&  input,
                       bsl::ostream&                  errorStream,
                       Lexer                  *lexer)
@@ -323,7 +380,7 @@ int ParseUtil::parse(Grammar *output,
     return genericParse(output, input, errorStream, lexer);
 }
 
-int ParseUtil::parse(Rule *output,
+int ParseUtil::parse(Atom *output,
                       const bslstl::StringRef&  input,
                       bsl::ostream&                  errorStream,
                       Lexer                  *lexer)
@@ -331,7 +388,7 @@ int ParseUtil::parse(Rule *output,
     return genericParse(output, input, errorStream, lexer);
 }
 
-int ParseUtil::parse(Pattern *output,
+int ParseUtil::parse(SumOrDiff *output,
                       const bslstl::StringRef&  input,
                       bsl::ostream&                  errorStream,
                       Lexer                  *lexer)
@@ -339,7 +396,7 @@ int ParseUtil::parse(Pattern *output,
     return genericParse(output, input, errorStream, lexer);
 }
 
-int ParseUtil::parse(Alternation *output,
+int ParseUtil::parse(SumOrDiffTerm *output,
                       const bslstl::StringRef&  input,
                       bsl::ostream&                  errorStream,
                       Lexer                  *lexer)
@@ -347,7 +404,7 @@ int ParseUtil::parse(Alternation *output,
     return genericParse(output, input, errorStream, lexer);
 }
 
-int ParseUtil::parse(Concatenation *output,
+int ParseUtil::parse(ProdOrQuot *output,
                       const bslstl::StringRef&  input,
                       bsl::ostream&                  errorStream,
                       Lexer                  *lexer)
@@ -355,7 +412,7 @@ int ParseUtil::parse(Concatenation *output,
     return genericParse(output, input, errorStream, lexer);
 }
 
-int ParseUtil::parse(PatternTerm *output,
+int ParseUtil::parse(PlusOrMinus::Value *output,
                       const bslstl::StringRef&  input,
                       bsl::ostream&                  errorStream,
                       Lexer                  *lexer)
@@ -363,23 +420,7 @@ int ParseUtil::parse(PatternTerm *output,
     return genericParse(output, input, errorStream, lexer);
 }
 
-int ParseUtil::parse(BoundPatternTerm *output,
-                      const bslstl::StringRef&  input,
-                      bsl::ostream&                  errorStream,
-                      Lexer                  *lexer)
-{
-    return genericParse(output, input, errorStream, lexer);
-}
-
-int ParseUtil::parse(QuantifiedPatternTerm *output,
-                      const bslstl::StringRef&  input,
-                      bsl::ostream&                  errorStream,
-                      Lexer                  *lexer)
-{
-    return genericParse(output, input, errorStream, lexer);
-}
-
-int ParseUtil::parse(UnquantifiedPatternTerm *output,
+int ParseUtil::parse(TimesOrDividedBy::Value *output,
                       const bslstl::StringRef&  input,
                       bsl::ostream&                  errorStream,
                       Lexer                  *lexer)

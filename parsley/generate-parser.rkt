@@ -34,10 +34,18 @@
 }
 }]))
 
-(define (declare-parse-function output-class lexer-class ns)
+(define (type-name class)
+  "Return the value type corresponding to the specified `schema/*` class. The
+   idea is that enumerations are called Name::Value, while everything else is
+   just Name."
+  (match class
+    [(schema/enumeration name _ _) (~a name "::Value")]
+    [(schema/base name _)          name]))
+
+(define (declare-parse-function output-type lexer-class ns)
   (let ([margin (make-string 4 #\space)])
     @~a{@""
-@|margin|static int parse(@output-class                 *output,
+@|margin|static int parse(@(type-name output-type)      *output,
 @|margin|                 const @|ns|bslstl::StringRef&  input,
 @|margin|                 bsl::ostream&                  errorStream,
 @|margin|                 @lexer-class                  *lexer = 0);}))
@@ -211,7 +219,7 @@ int readNumeric(Number               *output,
     "\n"
     (numeric-read-undefine-macro)))
 
-(define (parser-header class-names
+(define (parser-header classes
                        package-name
                        enterprise-namespace 
                        parser-class 
@@ -219,29 +227,28 @@ int readNumeric(Number               *output,
   (let* ([ns (calculate-bloomberg-prefix enterprise-namespace)]
          [guard-macro (~>> (list "INCLUDED" package-name parser-class)
                            (map string-upcase)
-                           (string-join* "_"))])
+                           (string-join* "_"))]
+         ; TODO?
+         [messages-component (~a (string-downcase package-name) "_messages")])
     @~a{
 #ifndef @guard-macro
 #define @guard-macro
+
+#include <@|messages-component|.h>
 
 #include <bsl_iosfwd.h>
 #include <bsl_string.h>
 
 namespace @enterprise-namespace {
 namespace @package-name {
-@(~>> ; forward declarations of generated classes and the lexer
-   (cons lexer-class class-names)
-   (map ~a)
-   (sort _ string<?)
-   (map (lambda (name) (~a "class " name ";")))
-   (string-join* "\n"))
+class @|lexer-class|;
 
 struct @parser-class {
     // This 'struct' provides a namespace of functions used to parse instances
     // of generated types from text.
 @(~>> ; declare an overload of "parse" for each class
-   class-names
-   (map (lambda (name) (declare-parse-function name lexer-class ns)))
+   classes
+   (map (lambda (type) (declare-parse-function type lexer-class ns)))
    (string-join* "\n"))
         // Load into the specified 'output' a value parsed from the specified
         // 'input'. If an error occurs, write diagnostics to the specified
@@ -335,7 +342,7 @@ struct @parser-class {
                        enterprise-namespace
                        grammar-text)
   (let* ([ns (calculate-bloomberg-prefix enterprise-namespace)]
-         [class-names (map schema/base-name classes)]
+         [type-names (map type-name classes)]
          [parser-decl (~a "struct " parser-class)]
          [parser-border (make-string (string-length parser-decl) #\-)]
          [token-class (~a lexer-class "Token")]
@@ -380,7 +387,7 @@ namespace {
 typedef bsl::vector<@|token-class|>::const_iterator TokenIter;
 
 @(string-join* "\n\n"
-  (for/list ([name class-names])
+  (for/list ([name type-names])
     @~a{
 int read(@name        *output,
          TokenIter    *token,
@@ -597,7 +604,7 @@ int read(bsl::string          *output,
                             // @parser-border
 
 @(string-join* "\n\n"
-   (for/list ([name class-names])
+   (for/list ([name type-names])
      @~a{int @|parser-class|::parse(@name *output,
                       const @|ns|bslstl::StringRef&  input,
                       bsl::ostream&                  errorStream,

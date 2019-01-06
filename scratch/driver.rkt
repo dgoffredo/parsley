@@ -61,7 +61,7 @@
 
 (to-file-named
   "snazzy_parseutil.h" 
-  (parser-header (map schema/base-name types)
+  (parser-header types
                  "snazzy"
                  "BloombergLP" 
                  "ParseUtil" 
